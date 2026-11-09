@@ -264,7 +264,7 @@ a.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
     const url = method==="GET" ? conn.url+(conn.url.includes("?")?"&":"?")+"clave="+encodeURIComponent(conn.clave)+"&t="+Date.now() : conn.url;
     let res;
     try{ res = await fetch(url, opts); }
-    catch(e){ throw new Error("No se pudo conectar con la hoja. Revisa tu internet y que la URL sea la de la aplicación web."); }
+    catch(e){ throw new Error("No se pudo conectar con la hoja. Lo más común: la aplicación web no tiene el acceso \"Cualquier usuario\" (Google pide iniciar sesión). Revísalo en Apps Script → Implementar → Administrar implementaciones, y que la URL termine en /exec."); }
     let data;
     try{ data = await res.json(); }
     catch(e){ throw new Error("La hoja no respondió como se esperaba. Revisa que la aplicación web tenga acceso \"Cualquier usuario\"."); }
