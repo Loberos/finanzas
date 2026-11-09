@@ -7,7 +7,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 /* Layout: libreta contable — resumen arriba, formulario a la izquierda, presupuesto y movimientos a la derecha */
 :root{
@@ -102,29 +101,66 @@ details summary{cursor:pointer;font-weight:600;font-size:14px;color:var(--accent
 .foot{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
 @media (prefers-reduced-motion:no-preference){.bar i{transition:width .3s ease}}
 </style>
+<style>
+[hidden]{display:none!important}
+a.btn{display:inline-flex;align-items:center;font-weight:600;text-decoration:none;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:9px 14px}
+a.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+a.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
+.status.info{background:var(--bg);color:var(--muted);border:1px solid var(--line)}
+.status.ok{background:var(--good-bg);color:var(--good)}
+.status.err{background:var(--bad-bg);color:var(--bad)}
+#conexion{max-width:560px}
+#conexion ol{margin:0 0 14px;padding-left:20px;color:var(--muted);font-size:14px}
+#conexion form{gap:12px}
+.sheetname{font-size:13px;color:var(--muted)}
+.sheetname a{color:var(--accent)}
+.linkbtn{background:none;border:none;color:var(--accent);padding:0;font-size:13px;font-weight:600;text-decoration:underline}
+.busy{opacity:.6}
+</style>
 </head>
 <body>
 <div class="wrap">
   <header>
     <div>
       <h1>Mis Finanzas</h1>
-      <p class="sub">Registra gastos e ingresos en soles o dólares. Todo se resume en S/ y se descarga a Excel. Tus datos se guardan solo en este navegador.</p>
+      <p class="sub">Registra gastos e ingresos en soles o dólares. Todo se guarda en tu hoja de Google Sheets.</p>
+      <p class="sheetname" id="sheetName" hidden></p>
     </div>
-    <div class="toolbar">
+    <div class="toolbar" id="toolbar" hidden>
       <label for="mes">Mes
         <input type="month" id="mes">
       </label>
       <label for="tcDefault">Tipo de cambio (S/ por US$)
         <input type="number" id="tcDefault" class="num" step="0.001" min="0.001" inputmode="decimal" style="width:130px">
       </label>
-      <button type="button" id="btnImport">Importar Excel</button>
-      <input type="file" id="fileImport" accept=".xlsx,.xls" hidden>
-      <button class="primary" id="btnExcel" type="button">Descargar Excel</button>
+      <button type="button" id="btnRefresh">Actualizar</button>
+      <a class="btn" id="lnkSheet" href="#" target="_blank" rel="noopener">Abrir hoja</a>
+      <a class="btn primary" id="lnkXlsx" href="#" target="_blank" rel="noopener">Descargar Excel</a>
     </div>
   </header>
 
-  <div class="status" id="status" hidden></div>
+  <div class="status info" id="status" role="status" aria-live="polite" hidden></div>
 
+  <section class="card" id="conexion" aria-labelledby="cTitle" hidden>
+    <h2 id="cTitle">Conecta tu hoja de Google Sheets</h2>
+    <ol>
+      <li>Abre tu hoja, ve a <strong>Extensiones → Apps Script</strong> y pega el código de <code>apps-script/Code.gs</code>.</li>
+      <li>Implementa como <strong>Aplicación web</strong> (ejecutar como: tú; acceso: cualquier usuario).</li>
+      <li>Pega aquí la URL de la aplicación web y la clave que pusiste en el código.</li>
+    </ol>
+    <form id="formConexion" novalidate>
+      <label for="apiUrl">URL de la aplicación web
+        <input type="url" id="apiUrl" placeholder="https://script.google.com/macros/s/…/exec" required>
+      </label>
+      <label for="apiClave">Clave
+        <input type="password" id="apiClave" autocomplete="off" required>
+      </label>
+      <button class="primary" type="submit" id="btnConectar">Conectar</button>
+      <div class="msg" id="cMsg" role="status" aria-live="polite"></div>
+    </form>
+  </section>
+
+  <div id="app" hidden>
   <section class="tiles" aria-label="Resumen del mes">
     <div class="tile"><div class="k">Ingresos</div><div class="v pos" id="tIng">S/ 0.00</div><div class="h" id="tIngN">0 movimientos</div></div>
     <div class="tile"><div class="k">Gastos</div><div class="v neg" id="tGas">S/ 0.00</div><div class="h" id="tGasN">0 movimientos</div></div>
@@ -132,7 +168,7 @@ details summary{cursor:pointer;font-weight:600;font-size:14px;color:var(--accent
     <div class="tile"><div class="k">Presupuesto usado</div><div class="v" id="tPre">—</div><div class="h" id="tPreH">Define tus límites abajo</div></div>
   </section>
 
-  <div class="grid">
+  <div class="grid" style="margin-top:18px">
     <div class="col">
       <section class="card" aria-labelledby="fTitle">
         <h2 id="fTitle">Nuevo movimiento</h2>
@@ -158,10 +194,11 @@ details summary{cursor:pointer;font-weight:600;font-size:14px;color:var(--accent
             </select>
           </label>
           <label for="nota">Descripción <span class="hint">(opcional)</span><input type="text" id="nota" maxlength="140" placeholder="Ej. Menú del almuerzo, recibo de luz…"></label>
-          <button class="primary" type="submit" id="btnSave">Guardar movimiento</button>
+          <button class="primary" type="submit" id="btnSave">Guardar en la hoja</button>
           <div class="msg" id="msg" role="status" aria-live="polite"></div>
         </form>
       </section>
+      <button type="button" class="linkbtn" id="btnDesconectar">Cambiar de hoja o de clave</button>
     </div>
 
     <div class="col">
@@ -195,6 +232,7 @@ details summary{cursor:pointer;font-weight:600;font-size:14px;color:var(--accent
       </section>
     </div>
   </div>
+  </div>
 </div>
 
 <script>
@@ -202,6 +240,7 @@ details summary{cursor:pointer;font-weight:600;font-size:14px;color:var(--accent
   "use strict";
   const CAT_GASTO = ["Alimentación","Transporte","Vivienda / Alquiler","Servicios (luz, agua, internet)","Salud","Educación","Entretenimiento","Ropa y cuidado personal","Deudas / Tarjetas","Ahorro e inversión","Otros gastos"];
   const CAT_ING = ["Sueldo","Ventas / Negocio","Freelance","Otros ingresos"];
+  const KEY_CONN = "finanzas.conexion";
   const $ = id => document.getElementById(id);
   const fmtPEN = n => "S/ " + (Number(n)||0).toLocaleString("es-PE",{minimumFractionDigits:2,maximumFractionDigits:2});
   const fmtCur = (n,m) => (m==="USD"?"US$ ":"S/ ") + (Number(n)||0).toLocaleString("es-PE",{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -210,12 +249,82 @@ details summary{cursor:pointer;font-weight:600;font-size:14px;color:var(--accent
   const esc = s => String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   const round2 = n => Math.round((Number(n)+Number.EPSILON)*100)/100;
 
-  const KEY_M="finanzas.movimientos", KEY_C="finanzas.config";
-  let movs=[];              // all movements
+  let conn=null;            // {url, clave}
+  let movs=[];
   let cfg={tc:3.75, presupuestos:{}};
   let pendingDel=null;
 
-  // ---- init UI ----
+  // ---------- conexión con la hoja (Apps Script) ----------
+  function loadConn(){ try{ const c=JSON.parse(localStorage.getItem(KEY_CONN)||"null"); return c&&c.url&&c.clave?c:null; }catch(e){ return null; } }
+  function saveConn(c){ try{ localStorage.setItem(KEY_CONN,JSON.stringify(c)); }catch(e){} }
+
+  async function api(method, body){
+    const opts = method==="GET" ? {method:"GET"} :
+      {method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"}, body:JSON.stringify(Object.assign({clave:conn.clave},body))};
+    const url = method==="GET" ? conn.url+(conn.url.includes("?")?"&":"?")+"clave="+encodeURIComponent(conn.clave)+"&t="+Date.now() : conn.url;
+    let res;
+    try{ res = await fetch(url, opts); }
+    catch(e){ throw new Error("No se pudo conectar con la hoja. Revisa tu internet y que la URL sea la de la aplicación web."); }
+    let data;
+    try{ data = await res.json(); }
+    catch(e){ throw new Error("La hoja no respondió como se esperaba. Revisa que la aplicación web tenga acceso \"Cualquier usuario\"."); }
+    if(!data.ok) throw new Error(data.error==="Clave incorrecta" ? "La clave no coincide con la del código Apps Script." : (data.error||"Error en la hoja."));
+    return data;
+  }
+
+  function aplicar(data){
+    movs = Array.isArray(data.movimientos) ? data.movimientos : [];
+    if(data.config) cfg = {tc:Number(data.config.tc)||cfg.tc, presupuestos:Object.assign({},data.config.presupuestos||{})};
+    if(data.hoja){
+      $("lnkSheet").href = data.hoja.url;
+      $("lnkXlsx").href = "https://docs.google.com/spreadsheets/d/"+encodeURIComponent(data.hoja.id)+"/export?format=xlsx";
+      const sn=$("sheetName"); sn.hidden=false;
+      sn.innerHTML = 'Conectado a <a href="'+esc(data.hoja.url)+'" target="_blank" rel="noopener">'+esc(data.hoja.nombre)+'</a>';
+    }
+    if(document.activeElement!==$("tcDefault")) $("tcDefault").value=cfg.tc;
+    if(document.activeElement!==$("tc")) $("tc").value=cfg.tc;
+    if(!$("bDetails").open) renderBudgetEditor();
+    render();
+  }
+
+  function setStatus(text, kind){ const s=$("status"); s.textContent=text||""; s.hidden=!text; s.className="status "+(kind||"info"); }
+
+  async function cargar(silencioso){
+    if(!silencioso) setStatus("Leyendo tu hoja de Google Sheets…","info");
+    $("app").classList.add("busy");
+    try{ aplicar(await api("GET")); setStatus("",null); return true; }
+    catch(e){ setStatus(e.message,"err"); return false; }
+    finally{ $("app").classList.remove("busy"); }
+  }
+
+  function mostrar(conectado){
+    $("conexion").hidden = conectado;
+    $("app").hidden = !conectado;
+    $("toolbar").hidden = !conectado;
+    if(!conectado) $("sheetName").hidden = true;
+  }
+
+  $("formConexion").addEventListener("submit", async e=>{
+    e.preventDefault();
+    const url=$("apiUrl").value.trim(), clave=$("apiClave").value.trim();
+    const m=$("cMsg");
+    if(!/^https:\/\/script\.google(usercontent)?\.com\//.test(url)){ m.textContent="La URL debe empezar con https://script.google.com/macros/s/… y terminar en /exec."; m.className="msg err"; return; }
+    if(!clave){ m.textContent="Escribe la clave."; m.className="msg err"; return; }
+    $("btnConectar").disabled=true; m.textContent="Probando la conexión…"; m.className="msg";
+    conn={url,clave};
+    try{ const data=await api("GET"); saveConn(conn); mostrar(true); aplicar(data); setStatus("Conectado. Lo que registres se guarda directo en tu hoja.","ok"); m.textContent=""; }
+    catch(err){ conn=null; m.textContent=err.message; m.className="msg err"; }
+    finally{ $("btnConectar").disabled=false; }
+  });
+
+  $("btnDesconectar").addEventListener("click",()=>{
+    try{ localStorage.removeItem(KEY_CONN); }catch(e){}
+    if(conn){ $("apiUrl").value=conn.url; }
+    conn=null; movs=[]; mostrar(false); setStatus("",null);
+  });
+  $("btnRefresh").addEventListener("click",()=>cargar(false));
+
+  // ---------- formulario ----------
   $("fecha").value = today();
   $("mes").value = today().slice(0,7);
   $("tcDefault").value = cfg.tc;
@@ -223,84 +332,12 @@ details summary{cursor:pointer;font-weight:600;font-size:14px;color:var(--accent
 
   function fillCategorias(){
     const tipo = document.querySelector('input[name="tipo"]:checked').value;
-    const list = tipo==="Gasto"?CAT_GASTO:CAT_ING;
-    $("categoria").innerHTML = list.map(c=>`<option>${esc(c)}</option>`).join("");
+    $("categoria").innerHTML = (tipo==="Gasto"?CAT_GASTO:CAT_ING).map(c=>`<option>${esc(c)}</option>`).join("");
   }
   function toggleTc(){ $("tcWrap").style.visibility = $("moneda").value==="USD" ? "visible" : "hidden"; }
   document.querySelectorAll('input[name="tipo"]').forEach(r=>r.addEventListener("change",fillCategorias));
   $("moneda").addEventListener("change",()=>{ $("tc").value = cfg.tc; toggleTc(); });
   fillCategorias(); toggleTc();
-
-  // ---- status ----
-  function setStatus(text, show){ const s=$("status"); s.textContent=text||""; s.hidden=!show; }
-
-  // ---- render ----
-  function monthMovs(){ const m=$("mes").value; return movs.filter(x=>x.mes===m); }
-  function render(){
-    const list = monthMovs();
-    let ing=0, gas=0, nI=0, nG=0; const porCat={};
-    list.forEach(x=>{ if(x.tipo==="Ingreso"){ing+=x.montoPEN;nI++;} else {gas+=x.montoPEN;nG++; porCat[x.categoria]=(porCat[x.categoria]||0)+x.montoPEN;} });
-    $("tIng").textContent=fmtPEN(ing); $("tGas").textContent=fmtPEN(gas);
-    $("tIngN").textContent=nI+(nI===1?" movimiento":" movimientos");
-    $("tGasN").textContent=nG+(nG===1?" movimiento":" movimientos");
-    const bal=ing-gas; const tb=$("tBal"); tb.textContent=fmtPEN(bal); tb.className="v "+(bal<0?"neg":"pos");
-    $("tAho").textContent = "Tasa de ahorro: " + (ing>0 ? Math.round(bal/ing*100)+"%" : "—");
-
-    // budget
-    const pres = cfg.presupuestos||{};
-    const totalPres = Object.values(pres).reduce((a,b)=>a+(Number(b)||0),0);
-    if(totalPres>0){
-      const gastoPres = Object.keys(pres).filter(k=>pres[k]>0).reduce((a,k)=>a+(porCat[k]||0),0);
-      const p = gastoPres/totalPres;
-      $("tPre").textContent=Math.round(p*100)+"%";
-      $("tPre").className="v "+(p>1?"neg":"");
-      $("tPreH").textContent=fmtPEN(gastoPres)+" de "+fmtPEN(totalPres);
-    } else { $("tPre").textContent="—"; $("tPre").className="v"; $("tPreH").textContent="Define tus límites abajo"; }
-
-    const cats = CAT_GASTO.filter(c=>(pres[c]>0)||(porCat[c]>0));
-    Object.keys(porCat).forEach(c=>{ if(!cats.includes(c)) cats.push(c); });
-    $("budget").innerHTML = cats.length ? cats.map(c=>{
-      const lim=Number(pres[c])||0, g=porCat[c]||0;
-      let cls="", pill="";
-      if(lim>0){ const p=g/lim; cls=p>1?"bad":p>=0.8?"warn":""; pill=p>1?'<span class="pill bad">Excedido</span>':p>=0.8?'<span class="pill warn">Cerca del límite</span>':'<span class="pill ok">OK</span>'; }
-      else pill='<span class="pill warn">Sin límite</span>';
-      const w = lim>0 ? Math.min(100,g/lim*100) : 100;
-      return `<div class="brow"><div class="bname">${esc(c)}<br>${pill}</div>
-        <div class="bar" role="img" aria-label="${esc(c)}: ${lim>0?Math.round(g/lim*100)+"% usado":"sin límite"}"><i class="${lim>0?cls:"warn"}" style="width:${w}%"></i></div>
-        <div class="bval num">${fmtPEN(g)}<br><span class="tag">${lim>0?"de "+fmtPEN(lim):"—"}</span></div></div>`;
-    }).join("") : '<div class="empty">Sin gastos ni límites este mes. Abre "Editar límites por categoría" para fijar tu presupuesto.</div>';
-
-    // table
-    const f=$("filtro").value;
-    const rows = list.filter(x=>!f||x.tipo===f).sort((a,b)=> (b.fecha+b.creado).localeCompare(a.fecha+a.creado));
-    $("empty").style.display = rows.length?"none":"block";
-    $("tbody").innerHTML = rows.map(x=>{
-      const sign = x.tipo==="Ingreso"?"pos":"neg";
-      const [y,m,d]=x.fecha.split("-");
-      return `<tr><td class="num">${d}/${m}</td>
-        <td><strong>${esc(x.categoria)}</strong>${x.nota?"<br>"+esc(x.nota):""}<br><span class="tag">${esc(x.metodo)}${x.moneda==="USD"?" · TC "+x.tc:""}</span></td>
-        <td class="r num">${fmtCur(x.monto,x.moneda)}</td>
-        <td class="r num ${sign}">${x.tipo==="Ingreso"?"+":"−"}${fmtPEN(x.montoPEN)}</td>
-        <td class="r"><button type="button" class="del${pendingDel===x.id?" confirm":""}" data-id="${esc(x.id)}">${pendingDel===x.id?"¿Eliminar?":"Borrar"}</button></td></tr>`;
-    }).join("");
-  }
-
-  function renderBudgetEditor(){
-    const pres=cfg.presupuestos||{};
-    $("bEdit").innerHTML = CAT_GASTO.map((c,i)=>`<label for="b${i}">${esc(c)}<input type="number" class="num" id="b${i}" data-cat="${esc(c)}" min="0" step="1" inputmode="decimal" placeholder="0" value="${pres[c]?pres[c]:""}"></label>`).join("");
-  }
-
-  // ---- events ----
-  $("mes").addEventListener("change",()=>{pendingDel=null;render();});
-  $("filtro").addEventListener("change",render);
-
-  $("tbody").addEventListener("click", async e=>{
-    const b=e.target.closest(".del"); if(!b) return;
-    const id=b.dataset.id;
-    if(pendingDel!==id){ pendingDel=id; render(); return; }
-    pendingDel=null;
-    movs=movs.filter(x=>x.id!==id); persist(); render();
-  });
 
   function showMsg(t,err){ const m=$("msg"); m.textContent=t; m.className="msg"+(err?" err":""); }
 
@@ -313,185 +350,107 @@ details summary{cursor:pointer;font-weight:600;font-size:14px;color:var(--accent
     if(!fecha){ showMsg("Elige una fecha.",true); return; }
     if(!(monto>0)){ showMsg("Ingresa un monto mayor que cero.",true); $("monto").focus(); return; }
     if(moneda==="USD" && !(tc>0)){ showMsg("Ingresa el tipo de cambio.",true); $("tc").focus(); return; }
-    const mov={tipo,fecha,mes:fecha.slice(0,7),monto,moneda,tc:moneda==="USD"?tc:1,montoPEN:round2(monto*(moneda==="USD"?tc:1)),
-      categoria:$("categoria").value,metodo:$("metodo").value,nota:$("nota").value.trim(),creado:new Date().toISOString()};
-    $("btnSave").disabled=true;
+    const mov={id:"m"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),tipo,fecha,mes:fecha.slice(0,7),monto,moneda,tc,
+      montoPEN:round2(monto*tc),categoria:$("categoria").value,metodo:$("metodo").value,nota:$("nota").value.trim(),creado:new Date().toISOString()};
+    $("btnSave").disabled=true; showMsg("Guardando en la hoja…");
     try{
-      mov.id="m"+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
-      movs.push(mov); render();
-      if(!persist()) throw {code:"storage"};
-      showMsg(`${tipo} de ${fmtCur(monto,moneda)} guardado.`);
+      const data = await api("POST",{accion:"agregar",mov});
+      if(mov.mes!==$("mes").value) $("mes").value=mov.mes;
+      aplicar(data);
+      showMsg(`${tipo} de ${fmtCur(monto,moneda)} guardado en la hoja.`);
       $("monto").value=""; $("nota").value=""; $("monto").focus();
-      if(mov.mes!==$("mes").value){ $("mes").value=mov.mes; render(); }
-    }catch(err){
-      showMsg("Se registró, pero tu navegador no permite guardarlo. Descarga el Excel antes de cerrar la página.",true);
-    }finally{ $("btnSave").disabled=false; }
+    }catch(err){ showMsg("No se guardó: "+err.message,true); }
+    finally{ $("btnSave").disabled=false; }
+  });
+
+  $("tbody").addEventListener("click", async e=>{
+    const b=e.target.closest(".del"); if(!b) return;
+    const id=b.dataset.id;
+    if(pendingDel!==id){ pendingDel=id; render(); return; }
+    pendingDel=null; b.disabled=true; b.textContent="Borrando…";
+    try{ aplicar(await api("POST",{accion:"borrar",id})); }
+    catch(err){ setStatus("No se pudo borrar: "+err.message,"err"); render(); }
   });
 
   let tcTimer=null;
   $("tcDefault").addEventListener("input",()=>{
     const v=Number($("tcDefault").value); if(!(v>0)) return;
     cfg.tc=v; if($("moneda").value==="USD") $("tc").value=v;
-    clearTimeout(tcTimer); tcTimer=setTimeout(saveCfg,800);
+    clearTimeout(tcTimer);
+    tcTimer=setTimeout(async ()=>{ try{ await api("POST",{accion:"config",config:{tc:v}}); }catch(err){ setStatus("No se guardó el tipo de cambio: "+err.message,"err"); } },900);
   });
 
   $("btnBudget").addEventListener("click", async ()=>{
     const p={};
     $("bEdit").querySelectorAll("input").forEach(i=>{ const v=Number(i.value); if(v>0) p[i.dataset.cat]=round2(v); });
-    cfg.presupuestos=p; render();
-    const ok = await saveCfg();
-    $("bMsg").textContent = ok ? "Presupuesto guardado." : "No se pudo guardar.";
-    $("bMsg").className = "msg"+(ok?"":" err");
+    const bm=$("bMsg"); $("btnBudget").disabled=true; bm.textContent="Guardando…"; bm.className="msg";
+    try{ cfg.presupuestos=p; const data=await api("POST",{accion:"config",config:{presupuestos:p}}); aplicar(data); bm.textContent="Presupuesto guardado en la hoja."; }
+    catch(err){ bm.textContent="No se guardó: "+err.message; bm.className="msg err"; }
+    finally{ $("btnBudget").disabled=false; }
   });
 
-  function persist(){
-    try{ localStorage.setItem(KEY_M,JSON.stringify(movs)); localStorage.setItem(KEY_C,JSON.stringify(cfg)); return true; }
-    catch(e){ setStatus("Tu navegador no está guardando los datos (modo incógnito o almacenamiento lleno). Descarga el Excel para no perderlos.",true); return false; }
+  $("mes").addEventListener("change",()=>{pendingDel=null;render();});
+  $("filtro").addEventListener("change",render);
+
+  // ---------- render ----------
+  function render(){
+    const list = movs.filter(x=>x.mes===$("mes").value);
+    let ing=0, gas=0, nI=0, nG=0; const porCat={};
+    list.forEach(x=>{ if(x.tipo==="Ingreso"){ing+=x.montoPEN;nI++;} else {gas+=x.montoPEN;nG++; porCat[x.categoria]=(porCat[x.categoria]||0)+x.montoPEN;} });
+    $("tIng").textContent=fmtPEN(ing); $("tGas").textContent=fmtPEN(gas);
+    $("tIngN").textContent=nI+(nI===1?" movimiento":" movimientos");
+    $("tGasN").textContent=nG+(nG===1?" movimiento":" movimientos");
+    const bal=ing-gas; const tb=$("tBal"); tb.textContent=fmtPEN(bal); tb.className="v "+(bal<0?"neg":"pos");
+    $("tAho").textContent = "Tasa de ahorro: " + (ing>0 ? Math.round(bal/ing*100)+"%" : "—");
+
+    const pres = cfg.presupuestos||{};
+    const totalPres = Object.values(pres).reduce((a,b)=>a+(Number(b)||0),0);
+    if(totalPres>0){
+      const gastoPres = Object.keys(pres).filter(k=>pres[k]>0).reduce((a,k)=>a+(porCat[k]||0),0);
+      const p = gastoPres/totalPres;
+      $("tPre").textContent=Math.round(p*100)+"%"; $("tPre").className="v "+(p>1?"neg":"");
+      $("tPreH").textContent=fmtPEN(gastoPres)+" de "+fmtPEN(totalPres);
+    } else { $("tPre").textContent="—"; $("tPre").className="v"; $("tPreH").textContent="Define tus límites abajo"; }
+
+    const cats = CAT_GASTO.filter(c=>(pres[c]>0)||(porCat[c]>0));
+    Object.keys(porCat).forEach(c=>{ if(!cats.includes(c)) cats.push(c); });
+    $("budget").innerHTML = cats.length ? cats.map(c=>{
+      const lim=Number(pres[c])||0, g=porCat[c]||0;
+      let cls="", pill;
+      if(lim>0){ const p=g/lim; cls=p>1?"bad":p>=0.8?"warn":""; pill=p>1?'<span class="pill bad">Excedido</span>':p>=0.8?'<span class="pill warn">Cerca del límite</span>':'<span class="pill ok">OK</span>'; }
+      else pill='<span class="pill warn">Sin límite</span>';
+      const w = lim>0 ? Math.min(100,g/lim*100) : 100;
+      return `<div class="brow"><div class="bname">${esc(c)}<br>${pill}</div>
+        <div class="bar" role="img" aria-label="${esc(c)}: ${lim>0?Math.round(g/lim*100)+"% usado":"sin límite"}"><i class="${lim>0?cls:"warn"}" style="width:${w}%"></i></div>
+        <div class="bval num">${fmtPEN(g)}<br><span class="tag">${lim>0?"de "+fmtPEN(lim):"—"}</span></div></div>`;
+    }).join("") : '<div class="empty">Sin gastos ni límites este mes. Abre "Editar límites por categoría" para fijar tu presupuesto.</div>';
+
+    const f=$("filtro").value;
+    const rows = list.filter(x=>!f||x.tipo===f).sort((a,b)=> (b.fecha+(b.creado||"")).localeCompare(a.fecha+(a.creado||"")));
+    $("empty").style.display = rows.length?"none":"block";
+    $("tbody").innerHTML = rows.map(x=>{
+      const sign = x.tipo==="Ingreso"?"pos":"neg";
+      const [y,m,d]=x.fecha.split("-");
+      return `<tr><td class="num">${d}/${m}</td>
+        <td><strong>${esc(x.categoria)}</strong>${x.nota?"<br>"+esc(x.nota):""}<br><span class="tag">${esc(x.metodo)}${x.moneda==="USD"?" · TC "+esc(x.tc):""}</span></td>
+        <td class="r num">${fmtCur(x.monto,x.moneda)}</td>
+        <td class="r num ${sign}">${x.tipo==="Ingreso"?"+":"−"}${fmtPEN(x.montoPEN)}</td>
+        <td class="r"><button type="button" class="del${pendingDel===x.id?" confirm":""}" data-id="${esc(x.id)}">${pendingDel===x.id?"¿Eliminar?":"Borrar"}</button></td></tr>`;
+    }).join("");
   }
-  async function saveCfg(){ return persist(); }
 
-  // ---- Excel export ----
-  function buildWorkbook(){
-    const X=window.XLSX;
-    const wb=X.utils.book_new();
-    const all=[...movs].sort((a,b)=>(a.fecha+a.creado).localeCompare(b.fecha+b.creado));
-    const mesSel=$("mes").value;
-
-    // Hoja 1: Movimientos (con fórmula de conversión a soles)
-    const head=["Fecha","Mes","Tipo","Categoría","Descripción","Medio de pago","Moneda","Monto","Tipo de cambio","Monto S/"];
-    const ws1=X.utils.aoa_to_sheet([head]);
-    all.forEach((x,i)=>{
-      const r=i+2; const [y,m,d]=x.fecha.split("-").map(Number);
-      X.utils.sheet_add_aoa(ws1,[[null,x.mes,x.tipo,x.categoria,x.nota,x.metodo,x.moneda,x.monto,x.tc]],{origin:"A"+r});
-      ws1["A"+r]={t:"n",v:Math.round((Date.UTC(y,m-1,d)-Date.UTC(1899,11,30))/86400000),z:"dd/mm/yyyy"};
-      ws1["H"+r].z="#,##0.00"; ws1["I"+r].z="0.000";
-      ws1["J"+r]={t:"n",v:x.montoPEN,f:`IF(G${r}="USD",H${r}*I${r},H${r})`,z:"#,##0.00"};
-    });
-    ws1["!ref"]="A1:J"+Math.max(1,all.length+1);
-    ws1["!cols"]=[{wch:11},{wch:9},{wch:9},{wch:30},{wch:34},{wch:18},{wch:8},{wch:12},{wch:14},{wch:12}];
-    ws1["!autofilter"]={ref:ws1["!ref"]};
-    X.utils.book_append_sheet(wb,ws1,"Movimientos");
-
-    // Hoja 2: Resumen mensual
-    const meses=[...new Set(all.map(x=>x.mes).concat([mesSel]))].sort();
-    const ws2=X.utils.aoa_to_sheet([["Mes","Ingresos S/","Gastos S/","Balance S/","Tasa de ahorro"]]);
-    meses.forEach((m,i)=>{
-      const r=i+2;
-      const ing=round2(all.filter(x=>x.mes===m&&x.tipo==="Ingreso").reduce((a,x)=>a+x.montoPEN,0));
-      const gas=round2(all.filter(x=>x.mes===m&&x.tipo==="Gasto").reduce((a,x)=>a+x.montoPEN,0));
-      ws2["A"+r]={t:"s",v:m};
-      ws2["B"+r]={t:"n",v:ing,f:`SUMIFS(Movimientos!J:J,Movimientos!B:B,A${r},Movimientos!C:C,"Ingreso")`,z:"#,##0.00"};
-      ws2["C"+r]={t:"n",v:gas,f:`SUMIFS(Movimientos!J:J,Movimientos!B:B,A${r},Movimientos!C:C,"Gasto")`,z:"#,##0.00"};
-      ws2["D"+r]={t:"n",v:round2(ing-gas),f:`B${r}-C${r}`,z:"#,##0.00"};
-      ws2["E"+r]= ing>0 ? {t:"n",v:(ing-gas)/ing,f:`IF(B${r}=0,"",D${r}/B${r})`,z:"0%"} : {t:"s",v:"",f:`IF(B${r}=0,"",D${r}/B${r})`};
-    });
-    const lr=meses.length+1, tr=lr+1;
-    ws2["A"+tr]={t:"s",v:"Total"};
-    ["B","C","D"].forEach(c=>{
-      let v=0; for(let r=2;r<=lr;r++) v+=ws2[c+r].v;
-      ws2[c+tr]={t:"n",v:round2(v),f:`SUM(${c}2:${c}${lr})`,z:"#,##0.00"};
-    });
-    ws2["!ref"]="A1:E"+tr;
-    ws2["!cols"]=[{wch:10},{wch:14},{wch:14},{wch:14},{wch:15}];
-    X.utils.book_append_sheet(wb,ws2,"Resumen mensual");
-
-    // Hoja 3: Presupuesto (el mes en B1 se puede cambiar en Excel)
+  function renderBudgetEditor(){
     const pres=cfg.presupuestos||{};
-    const ws3=X.utils.aoa_to_sheet([["Mes (AAAA-MM):",mesSel,"","Cambia el mes en B1 y todo se recalcula"],[],["Categoría","Presupuesto S/","Gastado S/","Restante S/","% usado","Estado"]]);
-    CAT_GASTO.forEach((c,i)=>{
-      const r=i+4; const lim=Number(pres[c])||0;
-      const g=round2(all.filter(x=>x.mes===mesSel&&x.tipo==="Gasto"&&x.categoria===c).reduce((a,x)=>a+x.montoPEN,0));
-      const p= lim>0? g/lim : null;
-      ws3["A"+r]={t:"s",v:c};
-      ws3["B"+r]={t:"n",v:lim,z:"#,##0.00"};
-      ws3["C"+r]={t:"n",v:g,f:`SUMIFS(Movimientos!J:J,Movimientos!B:B,$B$1,Movimientos!C:C,"Gasto",Movimientos!D:D,A${r})`,z:"#,##0.00"};
-      ws3["D"+r]={t:"n",v:round2(lim-g),f:`B${r}-C${r}`,z:"#,##0.00"};
-      ws3["E"+r]= p!==null? {t:"n",v:p,f:`IF(B${r}=0,"",C${r}/B${r})`,z:"0%"} : {t:"s",v:"",f:`IF(B${r}=0,"",C${r}/B${r})`};
-      const est = lim===0?(g>0?"Sin límite":""):(p>1?"Excedido":p>=0.8?"Cerca del límite":"OK");
-      ws3["F"+r]={t:"s",v:est,f:`IF(B${r}=0,IF(C${r}>0,"Sin límite",""),IF(C${r}/B${r}>1,"Excedido",IF(C${r}/B${r}>=0.8,"Cerca del límite","OK")))`};
-    });
-    const l3=CAT_GASTO.length+3, t3=l3+1;
-    ws3["A"+t3]={t:"s",v:"Total"};
-    ["B","C","D"].forEach(c=>{ let v=0; for(let r=4;r<=l3;r++) v+=ws3[c+r].v; ws3[c+t3]={t:"n",v:round2(v),f:`SUM(${c}4:${c}${l3})`,z:"#,##0.00"}; });
-    ws3["!ref"]="A1:F"+t3;
-    ws3["!cols"]=[{wch:30},{wch:15},{wch:13},{wch:13},{wch:9},{wch:16}];
-    X.utils.book_append_sheet(wb,ws3,"Presupuesto");
-
-    // Hoja 4: Gastos por categoría y mes
-    const mesesG=meses;
-    const ws4=X.utils.aoa_to_sheet([["Categoría"].concat(mesesG).concat(["Total"])]);
-    const colL=i=>X.utils.encode_col(i);
-    CAT_GASTO.forEach((c,ci)=>{
-      const r=ci+2; ws4["A"+r]={t:"s",v:c}; let tot=0;
-      mesesG.forEach((m,mi)=>{
-        const col=colL(mi+1);
-        const g=round2(all.filter(x=>x.mes===m&&x.tipo==="Gasto"&&x.categoria===c).reduce((a,x)=>a+x.montoPEN,0)); tot+=g;
-        ws4[col+r]={t:"n",v:g,f:`SUMIFS(Movimientos!$J:$J,Movimientos!$B:$B,${col}$1,Movimientos!$C:$C,"Gasto",Movimientos!$D:$D,$A${r})`,z:"#,##0.00"};
-      });
-      const tc=colL(mesesG.length+1);
-      ws4[tc+r]={t:"n",v:round2(tot),f:`SUM(B${r}:${colL(mesesG.length)}${r})`,z:"#,##0.00"};
-    });
-    ws4["!ref"]="A1:"+colL(mesesG.length+1)+(CAT_GASTO.length+1);
-    ws4["!cols"]=[{wch:30}].concat(mesesG.map(()=>({wch:12}))).concat([{wch:13}]);
-    X.utils.book_append_sheet(wb,ws4,"Gastos por categoría");
-
-    return wb;
+    $("bEdit").innerHTML = CAT_GASTO.map((c,i)=>`<label for="b${i}">${esc(c)}<input type="number" class="num" id="b${i}" data-cat="${esc(c)}" min="0" step="1" inputmode="decimal" placeholder="0" value="${pres[c]?pres[c]:""}"></label>`).join("");
   }
 
-  $("btnExcel").addEventListener("click", async ()=>{
-    if(!window.XLSX){ setStatus("No se pudo cargar el generador de Excel. Recarga la página.",true); return; }
-    const wb=buildWorkbook();
-    const out=window.XLSX.write(wb,{bookType:"xlsx",type:"array",compression:true});
-    const name="Finanzas_"+$("mes").value+".xlsx";
-    const blob=new Blob([out],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
-    const url=URL.createObjectURL(blob); const a=document.createElement("a");
-    a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(()=>URL.revokeObjectURL(url),2000);
-  });
-
-  // ---- import Excel ----
-  $("btnImport").addEventListener("click",()=>$("fileImport").click());
-  $("fileImport").addEventListener("change", async e=>{
-    const f=e.target.files[0]; e.target.value=""; if(!f) return;
-    if(!window.XLSX){ setStatus("No se pudo cargar el lector de Excel. Recarga la página.",true); return; }
-    try{
-      const wb=window.XLSX.read(new Uint8Array(await f.arrayBuffer()),{type:"array"});
-      const ws=wb.Sheets["Movimientos"]; if(!ws) throw new Error("El archivo no tiene la hoja Movimientos.");
-      const rows=window.XLSX.utils.sheet_to_json(ws,{header:1,raw:true}).slice(1);
-      const key=x=>[x.fecha,x.tipo,x.categoria,x.moneda,x.monto,x.nota].join("|");
-      const existing=new Set(movs.map(key)); let added=0, skipped=0;
-      rows.forEach(r=>{
-        if(!r||r[0]==null||r[7]==null) return;
-        let fecha;
-        if(typeof r[0]==="number"){ const d=new Date(Date.UTC(1899,11,30)+Math.round(r[0])*86400000); fecha=d.getUTCFullYear()+"-"+pad(d.getUTCMonth()+1)+"-"+pad(d.getUTCDate()); }
-        else { const t=String(r[0]).trim(); const m=t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/); fecha = m ? m[3]+"-"+pad(m[2])+"-"+pad(m[1]) : t.slice(0,10); }
-        if(!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return;
-        const moneda=String(r[6]||"PEN").toUpperCase()==="USD"?"USD":"PEN";
-        const monto=round2(r[7]); if(!(monto>0)) return;
-        const tc=moneda==="USD"?(Number(r[8])||cfg.tc):1;
-        const tipo=String(r[2]||"").toLowerCase().startsWith("ing")?"Ingreso":"Gasto";
-        const mov={tipo,fecha,mes:fecha.slice(0,7),monto,moneda,tc,montoPEN:round2(monto*tc),
-          categoria:String(r[3]||(tipo==="Gasto"?"Otros gastos":"Otros ingresos")),nota:String(r[4]||""),metodo:String(r[5]||"Otro"),creado:new Date().toISOString()};
-        if(existing.has(key(mov))){ skipped++; return; }
-        mov.id="m"+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
-        existing.add(key(mov)); movs.push(mov); added++;
-      });
-      const wp=wb.Sheets["Presupuesto"];
-      if(wp){ window.XLSX.utils.sheet_to_json(wp,{header:1,raw:true}).slice(3).forEach(r=>{ if(r&&CAT_GASTO.includes(r[0])&&Number(r[1])>0) cfg.presupuestos[r[0]]=round2(r[1]); }); renderBudgetEditor(); }
-      persist(); render();
-      setStatus(`Importación lista: ${added} movimientos nuevos`+(skipped?`, ${skipped} repetidos omitidos.`:"."),true);
-    }catch(err){ setStatus("No se pudo importar: "+(err&&err.message?err.message.replace(/\.$/,""):"archivo no válido")+". Usa un Excel descargado desde esta página.",true); }
-  });
-
-  // ---- load from this browser ----
-  try{
-    const m=JSON.parse(localStorage.getItem(KEY_M)||"[]"); if(Array.isArray(m)) movs=m;
-    const c=JSON.parse(localStorage.getItem(KEY_C)||"null");
-    if(c&&typeof c==="object") cfg={tc:Number(c.tc)||cfg.tc, presupuestos:Object.assign({},c.presupuestos||{})};
-    setStatus("",false);
-  }catch(e){ setStatus("Tu navegador no permite guardar datos aquí (modo incógnito). Descarga el Excel para no perderlos.",true); }
-  $("tcDefault").value=cfg.tc; $("tc").value=cfg.tc;
+  // ---------- inicio ----------
   renderBudgetEditor(); render();
+  conn = loadConn();
+  if(conn){ mostrar(true); cargar(false); }
+  else mostrar(false);
+  // Si editas la hoja a mano, al volver a la pestaña se actualiza
+  document.addEventListener("visibilitychange",()=>{ if(!document.hidden && conn) cargar(true); });
 })();
 </script>
 </body>

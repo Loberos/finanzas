@@ -1,0 +1,253 @@
+/**
+ * Mis Finanzas — API sobre Google Sheets
+ *
+ * Esta hoja de cálculo es la base de datos del formulario.
+ * Pega este código en Extensiones → Apps Script de tu hoja,
+ * cambia la CLAVE y publícalo como "Aplicación web".
+ */
+
+// Clave secreta: el formulario la envía en cada pedido. Cámbiala por una tuya.
+const CLAVE = 'CAMBIA_ESTA_CLAVE';
+
+const HOJA_MOV = 'Movimientos';
+const HOJA_PRES = 'Presupuesto';
+const HOJA_RES = 'Resumen mensual';
+const HOJA_CAT = 'Gastos por categoría';
+const HOJA_CFG = 'Config';
+
+const CAT_GASTO = ['Alimentación', 'Transporte', 'Vivienda / Alquiler', 'Servicios (luz, agua, internet)', 'Salud', 'Educación', 'Entretenimiento', 'Ropa y cuidado personal', 'Deudas / Tarjetas', 'Ahorro e inversión', 'Otros gastos'];
+
+// Columnas de Movimientos (1 = A)
+const COL = { id: 1, fecha: 2, mes: 3, tipo: 4, categoria: 5, nota: 6, metodo: 7, moneda: 8, monto: 9, tc: 10, montoPEN: 11, creado: 12 };
+const ENCABEZADOS = ['ID', 'Fecha', 'Mes', 'Tipo', 'Categoría', 'Descripción', 'Medio de pago', 'Moneda', 'Monto', 'Tipo de cambio', 'Monto S/', 'Registrado'];
+
+/* ---------- Puntos de entrada ---------- */
+
+function doGet(e) {
+  return responder_(function () {
+    verificarClave_(e.parameter.clave);
+    return leerTodo_();
+  });
+}
+
+function doPost(e) {
+  return responder_(function () {
+    const body = JSON.parse(e.postData.contents || '{}');
+    verificarClave_(body.clave);
+    const lock = LockService.getScriptLock();
+    lock.waitLock(20000);
+    try {
+      if (body.accion === 'agregar') agregar_(body.mov);
+      else if (body.accion === 'borrar') borrar_(body.id);
+      else if (body.accion === 'config') guardarConfig_(body.config);
+      else throw new Error('Acción desconocida');
+      SpreadsheetApp.flush();
+    } finally {
+      lock.releaseLock();
+    }
+    return leerTodo_();
+  });
+}
+
+/** Ejecútalo una vez desde el editor para crear las pestañas y dar permisos. */
+function configurar() {
+  configurar_();
+  SpreadsheetApp.getActive().toast('Hoja lista. Ahora implementa la aplicación web.', 'Mis Finanzas', 8);
+}
+
+/* ---------- Lógica ---------- */
+
+function responder_(fn) {
+  let out;
+  try {
+    configurar_();
+    out = Object.assign({ ok: true }, fn());
+  } catch (err) {
+    out = { ok: false, error: String(err && err.message || err) };
+  }
+  return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
+}
+
+function verificarClave_(c) {
+  if (!c || c !== CLAVE) throw new Error('Clave incorrecta');
+}
+
+function ss_() { return SpreadsheetApp.getActive(); }
+function tz_() { return ss_().getSpreadsheetTimeZone() || Session.getScriptTimeZone(); }
+
+function configurar_() {
+  const ss = ss_();
+  let mov = ss.getSheetByName(HOJA_MOV);
+  if (!mov) {
+    const vacia = ss.getSheets().length === 1 && ss.getSheets()[0].getLastRow() === 0 ? ss.getSheets()[0] : null;
+    mov = vacia ? vacia.setName(HOJA_MOV) : ss.insertSheet(HOJA_MOV, 0);
+    mov.getRange(1, 1, 1, ENCABEZADOS.length).setValues([ENCABEZADOS]).setFontWeight('bold').setBackground('#e8edf7');
+    // Columnas calculadas para TODAS las filas, también las que escribas a mano
+    mov.getRange('C1').setFormula('={"Mes";ARRAYFORMULA(IF(B2:B="","",TEXT(B2:B,"yyyy-mm")))}');
+    mov.getRange('K1').setFormula('={"Monto S/";ARRAYFORMULA(IF(I2:I="","",IF(H2:H="USD",I2:I*J2:J,I2:I)))}');
+    mov.getRange('B2:B').setNumberFormat('dd/mm/yyyy');
+    mov.getRange('I2:I').setNumberFormat('#,##0.00');
+    mov.getRange('J2:J').setNumberFormat('0.000');
+    mov.getRange('K2:K').setNumberFormat('#,##0.00');
+    mov.setFrozenRows(1);
+    mov.setColumnWidths(1, 12, 110);
+    mov.setColumnWidth(5, 220);
+    mov.setColumnWidth(6, 240);
+    const reglas = [
+      SpreadsheetApp.newDataValidation().requireValueInList(['Gasto', 'Ingreso'], true).build(),
+      SpreadsheetApp.newDataValidation().requireValueInList(['PEN', 'USD'], true).build()
+    ];
+    mov.getRange('D2:D').setDataValidation(reglas[0]);
+    mov.getRange('H2:H').setDataValidation(reglas[1]);
+  }
+  if (!ss.getSheetByName(HOJA_CFG)) {
+    const cfg = ss.insertSheet(HOJA_CFG);
+    cfg.getRange('A1:B1').setValues([['Tipo de cambio (S/ por US$)', 3.75]]);
+    cfg.getRange('A1').setFontWeight('bold');
+    cfg.setColumnWidth(1, 230);
+  }
+  if (!ss.getSheetByName(HOJA_PRES)) {
+    const p = ss.insertSheet(HOJA_PRES);
+    p.getRange('A1').setValue('Mes (AAAA-MM):').setFontWeight('bold');
+    p.getRange('B1').setFormula('=TEXT(TODAY(),"yyyy-mm")');
+    p.getRange('C1').setValue('Escribe otro mes en B1 para revisarlo');
+    p.getRange('A3:F3').setValues([['Categoría', 'Presupuesto S/', 'Gastado S/', 'Restante S/', '% usado', 'Estado']]).setFontWeight('bold').setBackground('#e8edf7');
+    const filas = CAT_GASTO.map(function (c, i) {
+      const r = i + 4;
+      return [c, 0,
+        '=SUMIFS(Movimientos!K:K,Movimientos!C:C,$B$1,Movimientos!D:D,"Gasto",Movimientos!E:E,A' + r + ')',
+        '=B' + r + '-C' + r,
+        '=IF(B' + r + '=0,"",C' + r + '/B' + r + ')',
+        '=IF(B' + r + '=0,IF(C' + r + '>0,"Sin límite",""),IF(C' + r + '/B' + r + '>1,"Excedido",IF(C' + r + '/B' + r + '>=0.8,"Cerca del límite","OK")))'];
+    });
+    p.getRange(4, 1, filas.length, 6).setValues(filas);
+    const t = CAT_GASTO.length + 4;
+    p.getRange(t, 1, 1, 5).setValues([['Total', '=SUM(B4:B' + (t - 1) + ')', '=SUM(C4:C' + (t - 1) + ')', '=B' + t + '-C' + t, '=IF(B' + t + '=0,"",C' + t + '/B' + t + ')']]);
+    p.getRange(t, 1, 1, 6).setFontWeight('bold');
+    p.getRange('B4:D' + t).setNumberFormat('#,##0.00');
+    p.getRange('E4:E' + t).setNumberFormat('0%');
+    p.setColumnWidth(1, 240);
+  }
+  if (!ss.getSheetByName(HOJA_RES)) {
+    const r = ss.insertSheet(HOJA_RES);
+    r.getRange('A1:E1').setValues([['Mes', 'Ingresos S/', 'Gastos S/', 'Balance S/', 'Tasa de ahorro']]).setFontWeight('bold').setBackground('#e8edf7');
+    r.getRange('A2').setFormula('=IFERROR(SORT(UNIQUE(FILTER(Movimientos!C2:C,Movimientos!C2:C<>""))),"")');
+    r.getRange('B2').setFormula('=ARRAYFORMULA(IF(A2:A="","",SUMIFS(Movimientos!K:K,Movimientos!C:C,A2:A,Movimientos!D:D,"Ingreso")))');
+    r.getRange('C2').setFormula('=ARRAYFORMULA(IF(A2:A="","",SUMIFS(Movimientos!K:K,Movimientos!C:C,A2:A,Movimientos!D:D,"Gasto")))');
+    r.getRange('D2').setFormula('=ARRAYFORMULA(IF(A2:A="","",B2:B-C2:C))');
+    r.getRange('E2').setFormula('=ARRAYFORMULA(IF(A2:A="","",IF(B2:B=0,"",D2:D/B2:B)))');
+    r.getRange('B2:D').setNumberFormat('#,##0.00');
+    r.getRange('E2:E').setNumberFormat('0%');
+    r.setColumnWidths(1, 5, 130);
+  }
+  if (!ss.getSheetByName(HOJA_CAT)) {
+    const g = ss.insertSheet(HOJA_CAT);
+    g.getRange('A1').setFormula('=IFERROR(QUERY(Movimientos!C:K,"select E, sum(K) where D = \'Gasto\' group by E pivot C label E \'Categoría\'",1),"Aún no hay gastos")');
+    g.setColumnWidth(1, 240);
+  }
+}
+
+function aFechaTexto_(v) {
+  if (v instanceof Date) return Utilities.formatDate(v, tz_(), 'yyyy-MM-dd');
+  const t = String(v || '').trim();
+  let m = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m) return m[3] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[1]).slice(-2);
+  m = t.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? m[0] : '';
+}
+
+function leerTodo_() {
+  const ss = ss_();
+  const sh = ss.getSheetByName(HOJA_MOV);
+  const n = ultimaFila_(sh) - 1;
+  const movimientos = [];
+  if (n > 0) {
+    const vals = sh.getRange(2, 1, n, ENCABEZADOS.length).getValues();
+    const idsNuevos = [];
+    vals.forEach(function (r, i) {
+      const fecha = aFechaTexto_(r[COL.fecha - 1]);
+      const monto = Number(r[COL.monto - 1]);
+      if (!fecha || !(monto > 0)) return;
+      let id = String(r[COL.id - 1] || '');
+      if (!id) { id = Utilities.getUuid().slice(0, 8); idsNuevos.push([i + 2, id]); }
+      const moneda = String(r[COL.moneda - 1]).toUpperCase() === 'USD' ? 'USD' : 'PEN';
+      const tc = moneda === 'USD' ? (Number(r[COL.tc - 1]) || leerTc_()) : 1;
+      const tipo = String(r[COL.tipo - 1]).toLowerCase().indexOf('ing') === 0 ? 'Ingreso' : 'Gasto';
+      movimientos.push({
+        id: id, fecha: fecha, mes: fecha.slice(0, 7), tipo: tipo,
+        categoria: String(r[COL.categoria - 1] || (tipo === 'Gasto' ? 'Otros gastos' : 'Otros ingresos')),
+        nota: String(r[COL.nota - 1] || ''), metodo: String(r[COL.metodo - 1] || ''),
+        moneda: moneda, monto: monto, tc: tc, montoPEN: Math.round(monto * tc * 100) / 100,
+        creado: r[COL.creado - 1] instanceof Date ? r[COL.creado - 1].toISOString() : String(r[COL.creado - 1] || '')
+      });
+    });
+    // Filas escritas a mano reciben un ID para poder borrarlas desde el formulario
+    idsNuevos.forEach(function (x) { sh.getRange(x[0], COL.id).setValue(x[1]); });
+  }
+  return { movimientos: movimientos, config: leerConfig_(), hoja: { url: ss.getUrl(), id: ss.getId(), nombre: ss.getName() } };
+}
+
+/** Última fila con datos reales (getLastRow no sirve: las ARRAYFORMULA llenan toda la columna). */
+function ultimaFila_(sh) {
+  const max = sh.getMaxRows();
+  const f = sh.getRange(1, COL.fecha, max, 1).getValues();
+  const m = sh.getRange(1, COL.monto, max, 1).getValues();
+  for (let i = max - 1; i >= 1; i--) {
+    if (f[i][0] !== '' || m[i][0] !== '') return i + 1;
+  }
+  return 1;
+}
+
+function leerTc_() {
+  return Number(ss_().getSheetByName(HOJA_CFG).getRange('B1').getValue()) || 3.75;
+}
+
+function leerConfig_() {
+  const p = ss_().getSheetByName(HOJA_PRES);
+  const filas = p.getRange(4, 1, CAT_GASTO.length, 2).getValues();
+  const presupuestos = {};
+  filas.forEach(function (r) { if (r[0] && Number(r[1]) > 0) presupuestos[r[0]] = Number(r[1]); });
+  return { tc: leerTc_(), presupuestos: presupuestos };
+}
+
+function agregar_(m) {
+  if (!m) throw new Error('Falta el movimiento');
+  const fecha = aFechaTexto_(m.fecha);
+  const monto = Number(m.monto);
+  if (!fecha) throw new Error('Fecha no válida');
+  if (!(monto > 0)) throw new Error('Monto no válido');
+  const p = fecha.split('-').map(Number);
+  const moneda = m.moneda === 'USD' ? 'USD' : 'PEN';
+  const tc = moneda === 'USD' ? Number(m.tc) : 1;
+  if (!(tc > 0)) throw new Error('Tipo de cambio no válido');
+  const sh = ss_().getSheetByName(HOJA_MOV);
+  const r = ultimaFila_(sh) + 1;
+  const id = String(m.id || Utilities.getUuid().slice(0, 8));
+  // C (Mes) y K (Monto S/) las calculan las fórmulas de la fila 1
+  sh.getRange(r, COL.id, 1, 2).setValues([[id, new Date(p[0], p[1] - 1, p[2])]]);
+  sh.getRange(r, COL.tipo, 1, 7).setValues([[m.tipo === 'Ingreso' ? 'Ingreso' : 'Gasto', String(m.categoria || ''), String(m.nota || ''), String(m.metodo || ''), moneda, monto, tc]]);
+  sh.getRange(r, COL.creado).setValue(new Date());
+}
+
+function borrar_(id) {
+  if (!id) throw new Error('Falta el ID');
+  const sh = ss_().getSheetByName(HOJA_MOV);
+  const n = ultimaFila_(sh) - 1;
+  if (n < 1) return;
+  const ids = sh.getRange(2, COL.id, n, 1).getValues();
+  for (let i = ids.length - 1; i >= 0; i--) {
+    if (String(ids[i][0]) === String(id)) { sh.deleteRow(i + 2); return; }
+  }
+}
+
+function guardarConfig_(c) {
+  if (!c) return;
+  const ss = ss_();
+  if (Number(c.tc) > 0) ss.getSheetByName(HOJA_CFG).getRange('B1').setValue(Number(c.tc));
+  if (c.presupuestos) {
+    const p = ss.getSheetByName(HOJA_PRES);
+    const cats = p.getRange(4, 1, CAT_GASTO.length, 1).getValues();
+    const vals = cats.map(function (r) { const v = Number(c.presupuestos[r[0]]); return [v > 0 ? v : 0]; });
+    p.getRange(4, 2, vals.length, 1).setValues(vals);
+  }
+}
