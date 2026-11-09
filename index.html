@@ -206,6 +206,13 @@ form{display:flex;flex-direction:column;gap:14px}
 .hero form button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
 @media (min-width:720px){.hero{flex-direction:row;align-items:center;justify-content:space-between;padding:22px 24px}.hero-side{flex-direction:column;align-items:flex-end;text-align:right}.hero form{min-width:320px}}
 
+/* ---------- guardado en segundo plano ---------- */
+.sync{position:fixed;right:14px;bottom:14px;z-index:20;display:flex;align-items:center;gap:8px;background:var(--ink);color:#fff;font-size:13px;font-weight:600;padding:9px 14px;border-radius:999px;box-shadow:0 6px 20px rgba(20,33,61,.25)}
+.sync.ok{background:var(--good)}
+.sync.err{background:var(--bad)}
+.sync .dot{width:8px;height:8px;border-radius:50%;background:#7fb0ff}
+@media (prefers-reduced-motion:no-preference){.sync .dot{animation:pulse 1s ease-in-out infinite}@keyframes pulse{50%{opacity:.3}}}
+
 /* ---------- ordenar ---------- */
 .orderbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;font-size:13px;background:var(--accent-soft);color:var(--accent);border-radius:var(--radius-s);padding:10px 12px;margin-bottom:6px;font-weight:600}
 .orderbar .foot .primary{flex:0 0 auto}
@@ -261,6 +268,7 @@ form{display:flex;flex-direction:column;gap:14px}
   </header>
 
   <div class="status info" id="status" role="status" aria-live="polite" hidden></div>
+  <div class="sync" id="sync" role="status" aria-live="polite" hidden></div>
 
   <section class="card" id="conexion" aria-labelledby="cTitle" hidden>
     <h2 id="cTitle">Conecta tu hoja de Google Sheets</h2>
@@ -547,9 +555,51 @@ form{display:flex;flex-direction:column;gap:14px}
 
   function setStatus(text, kind){ const s=$("status"); s.textContent=text||""; s.hidden=!text; s.className="status "+(kind||"info"); }
 
+  // ---------- guardado en segundo plano ----------
+  // La página se actualiza al instante; los cambios se envían a la hoja en orden, uno tras otro.
+  // Al terminar la cola se toma la respuesta de la hoja como la versión real.
+  const cola=[]; let procesando=false, ultimaRespuesta=null, syncTimer=null;
+  function pintarSync(){
+    const el=$("sync"); clearTimeout(syncTimer);
+    const n=cola.reduce((a,t)=>a+t.pasos.length,0);
+    if(n){ el.hidden=false; el.className="sync"; el.innerHTML='<span class="dot"></span>Guardando en la hoja'+(n>1?" ("+n+")":"")+"…"; }
+  }
+  function encolar(desc,pasos){ cola.push({desc,pasos}); pintarSync(); procesar(); }
+  async function enviar(body){
+    try{ return await api("POST",body); }
+    catch(e){
+      // reintentar solo lo que no duplica datos si llega dos veces (borrar, configuración)
+      const seguro = body.accion==="borrar"||body.accion==="config"||body.accion==="prestamo_borrar";
+      if(seguro && /conectar|respondió/.test(e.message)){ await new Promise(r=>setTimeout(r,800)); return await api("POST",body); }
+      throw e;
+    }
+  }
+  async function procesar(){
+    if(procesando) return; procesando=true;
+    while(cola.length){
+      const t=cola[0];
+      try{
+        while(t.pasos.length){ ultimaRespuesta=await enviar(t.pasos[0]); t.pasos.shift(); pintarSync(); }
+        cola.shift();
+      }catch(err){
+        cola.length=0; procesando=false;
+        const el=$("sync"); el.hidden=false; el.className="sync err"; el.textContent="No se guardó";
+        setStatus(`No se pudo guardar "${t.desc}": ${err.message} Se recargaron los datos reales de tu hoja; revisa y vuelve a intentarlo.`,"err");
+        await cargar(true); return;
+      }
+    }
+    procesando=false;
+    if(ultimaRespuesta){ aplicar(ultimaRespuesta); ultimaRespuesta=null; }
+    const el=$("sync"); el.hidden=false; el.className="sync ok"; el.textContent="✓ Guardado";
+    syncTimer=setTimeout(()=>{ el.hidden=true; },1800);
+  }
+  window.addEventListener("beforeunload",e=>{ if(cola.length){ e.preventDefault(); e.returnValue=""; } });
+  const nuevoId = pre => pre+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+
   async function cargar(silencioso){
+    if(cola.length||procesando) return true;   // no pisar cambios que aún se están guardando
     if(!silencioso) setStatus("Leyendo tu hoja de Google Sheets…","info");
-    try{ aplicar(await api("GET")); setStatus("",null); return true; }
+    try{ aplicar(await api("GET")); if(!silencioso) setStatus("",null); return true; }
     catch(e){ setStatus(e.message,"err"); return false; }
   }
 
@@ -622,17 +672,15 @@ form{display:flex;flex-direction:column;gap:14px}
       creado: orig && orig.creado ? orig.creado : new Date().toISOString(),
       prestamoId: transf ? "" : orig && String(orig.prestamoId||"").startsWith("r:") ? orig.prestamoId : ($("prestamoWrap").hidden ? "" : $("prestamoSel").value)};
     const etiqueta = transf ? `Movimiento entre tus cuentas de ${fmtCur(monto,moneda)} (${desde} → ${hacia})` : `${tipo} de ${fmtCur(monto,moneda)}`;
-    $("btnSave").disabled=true; showMsg("Guardando en la hoja…");
-    try{
-      // Editar = borrar la fila original y escribirla de nuevo con el mismo ID (así no hace falta cambiar el Apps Script)
-      if(orig) await api("POST",{accion:"borrar",id:orig.id});
-      const data = await api("POST",{accion:"agregar",mov});
-      if(mov.mes!==$("mes").value) $("mes").value=mov.mes;
-      aplicar(data);
-      if(orig){ terminarEdicion(); showMsg("Cambios guardados en la hoja."); if(fil.modo==="dia"){ fil.dia=mov.fecha; renderMovs(); } showTab("movimientos"); setStatus(`Movimiento actualizado: ${etiqueta} del ${fecha.split("-").reverse().join("/")}.`,"ok"); }
-      else { showMsg(`${etiqueta} guardado en la hoja.`); $("monto").value=""; $("nota").value=""; $("prestamoSel").value=""; $("monto").focus(); }
-    }catch(err){ showMsg((orig?"No se guardaron los cambios: ":"No se guardó: ")+err.message+(orig?" Tus datos siguen en el formulario; vuelve a pulsar Guardar.":""),true); }
-    finally{ $("btnSave").disabled=false; }
+    // Se muestra al instante y se guarda en segundo plano.
+    // Editar = borrar la fila original y escribirla de nuevo con el mismo ID (así no hace falta cambiar el Apps Script)
+    if(orig){ movs=movs.map(m=>m.id===orig.id?mov:m); encolar(etiqueta,[{accion:"borrar",id:orig.id},{accion:"agregar",mov}]); }
+    else { movs=movs.concat([mov]); encolar(etiqueta,[{accion:"agregar",mov}]); }
+    if(mov.mes!==$("mes").value) $("mes").value=mov.mes;
+    if(fil.modo==="dia" && (orig || mov.fecha!==fil.dia)) fil.dia=mov.fecha;
+    render();
+    if(orig){ terminarEdicion(); showMsg(""); showTab("movimientos"); setStatus(`Movimiento actualizado: ${etiqueta} del ${fecha.split("-").reverse().join("/")}.`,"ok"); }
+    else { showMsg(`${etiqueta} registrado.`); $("monto").value=""; $("nota").value=""; $("prestamoSel").value=""; $("monto").focus(); }
   });
 
   let editando=null;
@@ -674,25 +722,15 @@ form{display:flex;flex-direction:column;gap:14px}
     while(i>=0 && String(deseado[i].creado||"") > String(deseado[i+1].creado||"")) i--;
     const reescribir=deseado.slice(0,i+1).reverse();   // de abajo hacia arriba
     if(!reescribir.length){ ordenando=false; renderMovs(); setStatus("El orden no cambió.","info"); return; }
-    const b=$("btnOrdGuardar"); b.disabled=true; $("btnOrdCancelar").disabled=true;
-    let data=null, hechos=0;
-    try{
-      for(const m of reescribir){
-        b.textContent=`Guardando ${hechos+1} de ${reescribir.length}…`;
-        await api("POST",{accion:"borrar",id:m.id});
-        let ok=false, ultimoError=null;
-        for(let intento=0;intento<2&&!ok;intento++){
-          try{ data=await api("POST",{accion:"agregar",mov:Object.assign({},m)}); ok=true; }catch(err){ ultimoError=err; }
-        }
-        if(!ok) throw new Error(`no se pudo volver a guardar "${m.categoria}${m.nota?" · "+m.nota:""}" (${fmtPEN(m.montoPEN)}). Regístralo de nuevo. Detalle: ${ultimoError.message}`);
-        hechos++;
-      }
-      ordenando=false; ultimoMovido=null; aplicar(data);
-      setStatus("Orden guardado.","ok");
-    }catch(err){
-      setStatus("Se interrumpió al guardar el orden: "+err.message,"err");
-      ordenando=false; cargar(true);
-    }finally{ b.disabled=false; b.textContent="Guardar orden"; $("btnOrdCancelar").disabled=false; }
+    // El nuevo orden se ve al instante (horas de registro locales); la hoja se actualiza en segundo plano.
+    const base=Date.now(); const pasos=[];
+    reescribir.forEach((m,k)=>{
+      const nuevo=Object.assign({},m,{creado:new Date(base+k*1000).toISOString()});
+      movs=movs.map(x=>x.id===m.id?nuevo:x);
+      pasos.push({accion:"borrar",id:m.id},{accion:"agregar",mov:Object.assign({},m)});
+    });
+    ordenando=false; ultimoMovido=null; renderMovs();
+    encolar("el nuevo orden",pasos);
   });
 
   $("tbody").addEventListener("click", async e=>{
@@ -709,9 +747,10 @@ form{display:flex;flex-direction:column;gap:14px}
     const b=e.target.closest(".del"); if(!b) return;
     const id=b.dataset.id;
     if(pendingDel!==id){ pendingDel=id; render(); return; }
-    pendingDel=null; b.disabled=true; b.textContent="Borrando…";
-    try{ aplicar(await api("POST",{accion:"borrar",id})); }
-    catch(err){ setStatus("No se pudo borrar: "+err.message,"err"); render(); }
+    pendingDel=null;
+    const m=movs.find(x=>x.id===id);
+    movs=movs.filter(x=>x.id!==id); render();
+    encolar(m?`borrar ${tipoDe(m).toLowerCase()} de ${fmtPEN(m.montoPEN)}`:"borrar el movimiento",[{accion:"borrar",id}]);
   });
 
   let tcTimer=null;
@@ -719,16 +758,15 @@ form{display:flex;flex-direction:column;gap:14px}
     const v=Number($("tcDefault").value); if(!(v>0)) return;
     cfg.tc=v; if($("moneda").value==="USD") $("tc").value=v;
     clearTimeout(tcTimer);
-    tcTimer=setTimeout(async ()=>{ try{ await api("POST",{accion:"config",config:{tc:v}}); }catch(err){ setStatus("No se guardó el tipo de cambio: "+err.message,"err"); } },900);
+    tcTimer=setTimeout(()=>encolar("el tipo de cambio",[{accion:"config",config:{tc:v}}]),900);
   });
 
   $("btnBudget").addEventListener("click", async ()=>{
     const p={};
     $("bEdit").querySelectorAll("input").forEach(i=>{ const v=Number(i.value); if(v>0) p[i.dataset.cat]=round2(v); });
-    const bm=$("bMsg"); $("btnBudget").disabled=true; bm.textContent="Guardando…"; bm.className="msg";
-    try{ cfg.presupuestos=p; const data=await api("POST",{accion:"config",config:{presupuestos:p}}); aplicar(data); bm.textContent="Presupuesto guardado en la hoja."; }
-    catch(err){ bm.textContent="No se guardó: "+err.message; bm.className="msg err"; }
-    finally{ $("btnBudget").disabled=false; }
+    cfg.presupuestos=p; render();
+    $("bMsg").textContent="Presupuesto actualizado."; $("bMsg").className="msg";
+    encolar("el presupuesto",[{accion:"config",config:{presupuestos:p}}]);
   });
 
   $("mes").addEventListener("change",()=>{pendingDel=null;render();});
@@ -806,13 +844,10 @@ form{display:flex;flex-direction:column;gap:14px}
     const mov={id:"m"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),tipo:dif>0?"Ingreso":"Gasto",fecha:today(),mes:today().slice(0,7),
       monto:Math.abs(dif),moneda:"PEN",tc:1,montoPEN:Math.abs(dif),categoria:CAT_AJUSTE,metodo:"Otro",
       nota:"Saldo real informado: "+fmtPEN(real),creado:new Date().toISOString(),prestamoId:""};
-    $("btnAjGuardar").disabled=true; am.textContent="Guardando…"; am.className="msg";
-    try{
-      aplicar(await api("POST",{accion:"agregar",mov}));
-      $("formAjuste").hidden=true; $("heroSide").hidden=false;
-      setStatus(`Saldo ajustado a ${fmtPEN(real)} (diferencia de ${dif>0?"+":"−"}${fmtPEN(Math.abs(dif))}).`,"ok");
-    }catch(err){ am.textContent="No se guardó: "+err.message; am.className="msg err"; }
-    finally{ $("btnAjGuardar").disabled=false; }
+    movs=movs.concat([mov]); render();
+    $("formAjuste").hidden=true; $("heroSide").hidden=false;
+    setStatus(`Saldo ajustado a ${fmtPEN(real)} (diferencia de ${dif>0?"+":"−"}${fmtPEN(Math.abs(dif))}).`,"ok");
+    encolar("el ajuste de saldo",[{accion:"agregar",mov}]);
   });
 
   // ---------- filtros de movimientos ----------
@@ -1018,23 +1053,20 @@ form{display:flex;flex-direction:column;gap:14px}
     const ib=e.target.closest("[data-ingreso]");
     if(ib){
       const p=prestamos.find(x=>x.id===ib.dataset.ingreso); if(!p) return;
-      ib.disabled=true; ib.textContent="Registrando…";
-      try{ aplicar(await api("POST",{accion:"agregar",mov:movIngreso(p)})); setStatus(`Se registró el ingreso de ${fmtPEN(p.monto)} del préstamo ${p.entidad} el ${fmtD(parseD(p.fecha))}.`,"ok"); }
-      catch(err){ setStatus("No se pudo registrar el ingreso: "+err.message,"err"); renderPrestamos(); }
+      const mov=movIngreso(p); movs=movs.concat([mov]); render();
+      setStatus(`Se registró el ingreso de ${fmtPEN(p.monto)} del préstamo ${p.entidad} el ${fmtD(parseD(p.fecha))}.`,"ok");
+      encolar("el ingreso del préstamo",[{accion:"agregar",mov}]);
       return;
     }
     const db=e.target.closest("[data-borrarp]");
     if(db){
       const id=db.dataset.borrarp;
       if(pendingDel!==id){ pendingDel=id; renderPrestamos(); return; }
-      pendingDel=null; db.disabled=true; db.textContent="Eliminando…";
-      try{
-        const ing=movs.find(m=>m.prestamoId===refIngreso(id));
-        if(ing) await api("POST",{accion:"borrar",id:ing.id});
-        aplicar(await api("POST",{accion:"prestamo_borrar",id}));
-        setStatus("Préstamo eliminado"+(ing?", junto con su ingreso":"")+". Los pagos de cuotas que hiciste siguen en Movimientos como gastos.","ok");
-      }
-      catch(err){ setStatus("No se pudo eliminar: "+err.message,"err"); renderPrestamos(); }
+      pendingDel=null;
+      const ing=movs.find(m=>m.prestamoId===refIngreso(id));
+      prestamos=prestamos.filter(x=>x.id!==id); if(ing) movs=movs.filter(m=>m.id!==ing.id); render();
+      setStatus("Préstamo eliminado"+(ing?", junto con su ingreso":"")+". Los pagos de cuotas que hiciste siguen en Movimientos como gastos.","ok");
+      encolar("eliminar el préstamo",(ing?[{accion:"borrar",id:ing.id}]:[]).concat([{accion:"prestamo_borrar",id}]));
     }
   });
 
@@ -1087,16 +1119,14 @@ form{display:flex;flex-direction:column;gap:14px}
     if(!(prestamo.cuotas>0)) return err("Ingresa el número de cuotas.");
     if(!(prestamo.cuota>0)) return err("Ingresa el monto de cada cuota.");
     if(!prestamo.primer) return err("Elige la fecha del primer vencimiento.");
-    $("btnPrestamo").disabled=true; pm.textContent="Guardando en la hoja…"; pm.className="msg";
-    try{
-      let data=await api("POST",{accion:"prestamo_agregar",prestamo});
-      const conIngreso=$("pIngreso").checked;
-      if(conIngreso) data=await api("POST",{accion:"agregar",mov:movIngreso(prestamo)});
-      aplicar(data);
-      pm.textContent=`Préstamo de ${prestamo.entidad} guardado`+(conIngreso?` y ${fmtPEN(prestamo.monto)} registrados como ingreso.`:".");
-      ["pEntidad","pMonto","pCuotas","pCuota","pPrimer","pNota"].forEach(id=>$(id).value=""); calcPrestamo();
-    }catch(e2){ err("No se guardó: "+e2.message); }
-    finally{ $("btnPrestamo").disabled=false; }
+    const conIngreso=$("pIngreso").checked;
+    const pasos=[{accion:"prestamo_agregar",prestamo}];
+    prestamos=prestamos.concat([prestamo]);
+    if(conIngreso){ const mov=movIngreso(prestamo); movs=movs.concat([mov]); pasos.push({accion:"agregar",mov}); }
+    render();
+    pm.textContent=`Préstamo de ${prestamo.entidad} registrado`+(conIngreso?` y ${fmtPEN(prestamo.monto)} como ingreso.`:"."); pm.className="msg";
+    ["pEntidad","pMonto","pCuotas","pCuota","pPrimer","pNota"].forEach(id=>$(id).value=""); calcPrestamo();
+    encolar("el préstamo de "+prestamo.entidad,pasos);
   });
 
   function renderBudgetEditor(){
