@@ -202,6 +202,13 @@ form{display:flex;flex-direction:column;gap:14px}
 .hero form button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
 @media (min-width:720px){.hero{flex-direction:row;align-items:center;justify-content:space-between;padding:22px 24px}.hero-side{flex-direction:column;align-items:flex-end;text-align:right}.hero form{min-width:320px}}
 
+/* ---------- ordenar ---------- */
+.orderbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;font-size:13px;background:var(--accent-soft);color:var(--accent);border-radius:var(--radius-s);padding:10px 12px;margin-bottom:6px;font-weight:600}
+.orderbar .foot .primary{flex:0 0 auto}
+.tx.moving{background:var(--accent-soft);border-radius:var(--radius-s)}
+.arrows button{width:40px;padding:0;font-size:18px}
+@media (prefers-reduced-motion:no-preference){.tx{transition:background .4s}}
+
 /* ---------- filtros ---------- */
 .filters{display:flex;flex-direction:column;gap:10px;margin-bottom:12px}
 .chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
@@ -364,7 +371,10 @@ form{display:flex;flex-direction:column;gap:14px}
       <section class="card" aria-labelledby="mTitle">
         <div class="cardhead">
           <h2 id="mTitle">Movimientos</h2>
-          <button type="button" class="linkbtn" id="fLimpiar" hidden>Quitar filtros</button>
+          <div style="display:flex;gap:14px;align-items:center">
+            <button type="button" class="linkbtn" id="fLimpiar" hidden>Quitar filtros</button>
+            <button type="button" class="small" id="btnOrdenar" hidden>Ordenar</button>
+          </div>
         </div>
         <div class="filters">
           <div class="chips" role="group" aria-label="Periodo">
@@ -392,6 +402,10 @@ form{display:flex;flex-direction:column;gap:14px}
           </div>
         </div>
         <div class="fsum" id="fSum"></div>
+        <div class="orderbar" id="orderBar" hidden>
+          <span>Usa las flechas para mover los movimientos de este día.</span>
+          <div class="foot"><button type="button" class="primary small" id="btnOrdGuardar">Guardar orden</button><button type="button" class="small" id="btnOrdCancelar">Cancelar</button></div>
+        </div>
         <ul class="txlist" id="tbody"></ul>
         <div class="empty" id="empty"></div>
       </section>
@@ -622,7 +636,51 @@ form{display:flex;flex-direction:column;gap:14px}
   }
   $("btnCancelEdit").addEventListener("click",()=>{ terminarEdicion(); showMsg(""); showTab("movimientos"); });
 
+  // ---------- ordenar dentro de un día ----------
+  // El orden se guarda reescribiendo los movimientos (la hoja les pone una nueva hora de registro).
+  // Solo se reescriben los que quedaron fuera de orden, empezando desde abajo.
+  let ordenando=false, ordenIds=[], ultimoMovido=null;
+  function filasDelDia(){ return filtrados().sort((a,b)=>(b.fecha+(b.creado||"")).localeCompare(a.fecha+(a.creado||""))); }
+  $("btnOrdenar").addEventListener("click",()=>{ ordenando=true; ordenIds=filasDelDia().map(x=>x.id); ultimoMovido=null; pendingDel=null; renderMovs(); });
+  $("btnOrdCancelar").addEventListener("click",()=>{ ordenando=false; ultimoMovido=null; renderMovs(); });
+  $("btnOrdGuardar").addEventListener("click", async ()=>{
+    const porId=new Map(movs.map(m=>[m.id,m]));
+    const deseado=ordenIds.map(id=>porId.get(id)).filter(Boolean);
+    // desde abajo, mantener mientras cada uno sea más antiguo que el de arriba
+    let i=deseado.length-2;
+    while(i>=0 && String(deseado[i].creado||"") > String(deseado[i+1].creado||"")) i--;
+    const reescribir=deseado.slice(0,i+1).reverse();   // de abajo hacia arriba
+    if(!reescribir.length){ ordenando=false; renderMovs(); setStatus("El orden no cambió.","info"); return; }
+    const b=$("btnOrdGuardar"); b.disabled=true; $("btnOrdCancelar").disabled=true;
+    let data=null, hechos=0;
+    try{
+      for(const m of reescribir){
+        b.textContent=`Guardando ${hechos+1} de ${reescribir.length}…`;
+        await api("POST",{accion:"borrar",id:m.id});
+        let ok=false, ultimoError=null;
+        for(let intento=0;intento<2&&!ok;intento++){
+          try{ data=await api("POST",{accion:"agregar",mov:Object.assign({},m)}); ok=true; }catch(err){ ultimoError=err; }
+        }
+        if(!ok) throw new Error(`no se pudo volver a guardar "${m.categoria}${m.nota?" · "+m.nota:""}" (${fmtPEN(m.montoPEN)}). Regístralo de nuevo. Detalle: ${ultimoError.message}`);
+        hechos++;
+      }
+      ordenando=false; ultimoMovido=null; aplicar(data);
+      setStatus("Orden guardado.","ok");
+    }catch(err){
+      setStatus("Se interrumpió al guardar el orden: "+err.message,"err");
+      ordenando=false; cargar(true);
+    }finally{ b.disabled=false; b.textContent="Guardar orden"; $("btnOrdCancelar").disabled=false; }
+  });
+
   $("tbody").addEventListener("click", async e=>{
+    const up=e.target.closest("[data-up]"), down=e.target.closest("[data-down]");
+    if(up||down){
+      const id=(up||down).dataset[up?"up":"down"]; const i=ordenIds.indexOf(id); const j=up?i-1:i+1;
+      if(i<0||j<0||j>=ordenIds.length) return;
+      [ordenIds[i],ordenIds[j]]=[ordenIds[j],ordenIds[i]]; ultimoMovido=id; renderMovs();
+      const btn=document.querySelector(`[data-${up?"up":"down"}="${CSS.escape(id)}"]`); if(btn&&!btn.disabled) btn.focus(); else { const o=document.querySelector(`[data-${up?"down":"up"}="${CSS.escape(id)}"]`); if(o) o.focus(); }
+      return;
+    }
     const ed=e.target.closest("[data-edit]");
     if(ed){ const m=movs.find(x=>x.id===ed.dataset.edit); if(m) empezarEdicion(m); return; }
     const b=e.target.closest(".del"); if(!b) return;
@@ -774,7 +832,13 @@ form{display:flex;flex-direction:column;gap:14px}
     $("fLimpiar").hidden = !(extra || !(fil.modo==="dia"&&fil.dia===hoy));
     // datos
     const orden=(a,b)=>(b.fecha+(b.creado||"")).localeCompare(a.fecha+(a.creado||""));
-    const rows=filtrados().sort(orden);
+    let rows=filtrados().sort(orden);
+    if(ordenando){
+      const pos=new Map(ordenIds.map((id,i)=>[id,i]));
+      rows=rows.filter(x=>pos.has(x.id)).sort((a,b)=>pos.get(a.id)-pos.get(b.id));
+    }
+    $("btnOrdenar").hidden = ordenando || fil.modo!=="dia" || rows.length<2;
+    $("orderBar").hidden = !ordenando;
     let ing=0,gas=0; rows.forEach(x=>{ if(x.categoria===CAT_AJUSTE) return; if(x.tipo==="Ingreso") ing+=x.montoPEN; else gas+=x.montoPEN; });
     const [d,h]=rangoActual();
     const titulo = fil.modo==="dia" ? diaLargo(fil.dia) : fil.modo==="semana" ? "Últimos 7 días" : fil.modo==="mes" ? $("chipMes").textContent : (fil.desde||fil.hasta ? (fil.desde?fil.desde.split("-").reverse().join("/"):"…")+" – "+(fil.hasta?fil.hasta.split("-").reverse().join("/"):"…") : "Todas las fechas");
@@ -788,13 +852,13 @@ form{display:flex;flex-direction:column;gap:14px}
     $("empty").style.display = rows.length?"none":"block";
     let html="", dia="";
     const variosDias = fil.modo!=="dia";
-    rows.forEach(x=>{
+    rows.forEach((x,i)=>{
       if(variosDias && x.fecha!==dia){
         dia=x.fecha;
         const neto=round2(rows.filter(r=>r.fecha===dia).reduce((a,r)=>a+(r.tipo==="Ingreso"?r.montoPEN:-r.montoPEN),0));
         html+=`<li class="txday"><span>${esc(diaLargo(dia))}</span><span class="money ${neto<0?"neg":"pos"}">${neto<0?"−":"+"}${fmtPEN(Math.abs(neto))}</span></li>`;
       }
-      html+=txRow(x,true,false);
+      html+=txRow(x,true,false, ordenando ? {first:i===0,last:i===rows.length-1,moved:x.id===ultimoMovido} : null);
     });
     $("tbody").innerHTML = html;
   }
@@ -805,10 +869,10 @@ form{display:flex;flex-direction:column;gap:14px}
     else if(p==="ayer"){ fil.modo="dia"; fil.dia=isoMasDias(hoy,-1); }
     else if(p==="rango"){ fil.modo="rango"; if(!fil.desde&&!fil.hasta){ fil.desde=isoMasDias(hoy,-30); fil.hasta=hoy; } }
     else fil.modo=p;
-    pendingDel=null; renderMovs();
+    pendingDel=null; ordenando=false; renderMovs();
   });
-  $("dPrev").addEventListener("click",()=>{ fil.dia=isoMasDias(fil.dia,-1); renderMovs(); });
-  $("dNext").addEventListener("click",()=>{ fil.dia=isoMasDias(fil.dia,1); renderMovs(); });
+  $("dPrev").addEventListener("click",()=>{ fil.dia=isoMasDias(fil.dia,-1); ordenando=false; renderMovs(); });
+  $("dNext").addEventListener("click",()=>{ fil.dia=isoMasDias(fil.dia,1); ordenando=false; renderMovs(); });
   $("fDia").addEventListener("change",()=>{ if($("fDia").value){ fil.dia=$("fDia").value; renderMovs(); } });
   $("fDesde").addEventListener("change",()=>{ fil.desde=$("fDesde").value; renderMovs(); });
   $("fHasta").addEventListener("change",()=>{ fil.hasta=$("fHasta").value; renderMovs(); });
@@ -829,12 +893,12 @@ form{display:flex;flex-direction:column;gap:14px}
     const base=DIAS[dt.getDay()]+" "+d+" "+MESES[m-1];
     return t===hoy?"Hoy · "+base : t===ayer?"Ayer · "+base : base;
   }
-  function txRow(x, conAcciones, conFecha){
+  function txRow(x, conAcciones, conFecha, orden){
     const ing=x.tipo==="Ingreso";
     const [y,m,d]=x.fecha.split("-");
     const meta=[conFecha?d+"/"+m:"", x.metodo, x.moneda==="USD"?"TC "+x.tc:""].filter(Boolean).map(esc).join(" · ");
     const conf=pendingDel===x.id;
-    return `<li class="tx${conAcciones?" has-acts":""}">
+    return `<li class="tx${conAcciones?" has-acts":""}${orden&&orden.moved?" moving":""}" data-row="${esc(x.id)}">
       <div class="tx-ic${ing?" in":""}" aria-hidden="true">${esc((x.categoria||"?").charAt(0).toUpperCase())}</div>
       <div class="tx-main">
         <div class="tx-title">${esc(x.categoria)}</div>
@@ -842,7 +906,8 @@ form{display:flex;flex-direction:column;gap:14px}
         <div class="tx-meta">${meta}</div>
       </div>
       <div class="tx-amt ${ing?"pos":"neg"}">${ing?"+":"−"}${fmtPEN(x.montoPEN)}${x.moneda==="USD"?`<small>${fmtCur(x.monto,"USD")}</small>`:""}</div>
-      ${conAcciones?`<div class="tx-acts"><button type="button" class="small" data-edit="${esc(x.id)}">Editar</button><button type="button" class="small del${conf?" confirm":""}" data-id="${esc(x.id)}">${conf?"¿Eliminar?":"Borrar"}</button></div>`:""}
+      ${orden?`<div class="tx-acts arrows"><button type="button" class="small" data-up="${esc(x.id)}" aria-label="Subir" ${orden.first?"disabled":""}>↑</button><button type="button" class="small" data-down="${esc(x.id)}" aria-label="Bajar" ${orden.last?"disabled":""}>↓</button></div>`:""}
+      ${conAcciones&&!orden?`<div class="tx-acts"><button type="button" class="small" data-edit="${esc(x.id)}">Editar</button><button type="button" class="small del${conf?" confirm":""}" data-id="${esc(x.id)}">${conf?"¿Eliminar?":"Borrar"}</button></div>`:""}
     </li>`;
   }
 
