@@ -14,12 +14,17 @@ const HOJA_PRES = 'Presupuesto';
 const HOJA_RES = 'Resumen mensual';
 const HOJA_CAT = 'Gastos por categoría';
 const HOJA_CFG = 'Config';
+const HOJA_PRE = 'Préstamos';
 
 const CAT_GASTO = ['Alimentación', 'Transporte', 'Vivienda / Alquiler', 'Servicios (luz, agua, internet)', 'Salud', 'Educación', 'Entretenimiento', 'Ropa y cuidado personal', 'Deudas / Tarjetas', 'Ahorro e inversión', 'Otros gastos'];
 
 // Columnas de Movimientos (1 = A)
-const COL = { id: 1, fecha: 2, mes: 3, tipo: 4, categoria: 5, nota: 6, metodo: 7, moneda: 8, monto: 9, tc: 10, montoPEN: 11, creado: 12 };
-const ENCABEZADOS = ['ID', 'Fecha', 'Mes', 'Tipo', 'Categoría', 'Descripción', 'Medio de pago', 'Moneda', 'Monto', 'Tipo de cambio', 'Monto S/', 'Registrado'];
+const COL = { id: 1, fecha: 2, mes: 3, tipo: 4, categoria: 5, nota: 6, metodo: 7, moneda: 8, monto: 9, tc: 10, montoPEN: 11, creado: 12, prestamo: 13 };
+const ENCABEZADOS = ['ID', 'Fecha', 'Mes', 'Tipo', 'Categoría', 'Descripción', 'Medio de pago', 'Moneda', 'Monto', 'Tipo de cambio', 'Monto S/', 'Registrado', 'Préstamo'];
+
+// Columnas de Préstamos (1 = A)
+const PCOL = { id: 1, entidad: 2, nota: 3, fecha: 4, monto: 5, cuotas: 6, cuota: 7, frecuencia: 8, primer: 9, creado: 16 };
+const P_ENCABEZADOS = ['ID', 'Entidad', 'Descripción', 'Fecha de desembolso', 'Monto recibido S/', 'N° de cuotas', 'Monto de cuota S/', 'Frecuencia', 'Primer vencimiento', 'Total a pagar S/', 'Interés y costos S/', 'Pagado S/', 'Saldo pendiente S/', 'Cuotas pagadas', 'Estado', 'Registrado'];
 
 /* ---------- Puntos de entrada ---------- */
 
@@ -40,6 +45,8 @@ function doPost(e) {
       if (body.accion === 'agregar') agregar_(body.mov);
       else if (body.accion === 'borrar') borrar_(body.id);
       else if (body.accion === 'config') guardarConfig_(body.config);
+      else if (body.accion === 'prestamo_agregar') agregarPrestamo_(body.prestamo);
+      else if (body.accion === 'prestamo_borrar') borrarPrestamo_(body.id);
       else throw new Error('Acción desconocida');
       SpreadsheetApp.flush();
     } finally {
@@ -100,6 +107,22 @@ function configurar_() {
     mov.getRange('D2:D').setDataValidation(reglas[0]);
     mov.getRange('H2:H').setDataValidation(reglas[1]);
   }
+  // Versiones anteriores de la hoja no tenían la columna Préstamo
+  if (mov.getRange(1, COL.prestamo).getValue() === '') {
+    mov.getRange(1, COL.prestamo).setValue('Préstamo').setFontWeight('bold').setBackground('#e8edf7');
+  }
+  if (!ss.getSheetByName(HOJA_PRE)) {
+    const pr = ss.insertSheet(HOJA_PRE);
+    pr.getRange(1, 1, 1, P_ENCABEZADOS.length).setValues([P_ENCABEZADOS]).setFontWeight('bold').setBackground('#e8edf7');
+    pr.getRange('D2:D').setNumberFormat('dd/mm/yyyy');
+    pr.getRange('I2:I').setNumberFormat('dd/mm/yyyy');
+    pr.getRange('E2:E').setNumberFormat('#,##0.00');
+    pr.getRange('G2:G').setNumberFormat('#,##0.00');
+    pr.getRange('J2:M').setNumberFormat('#,##0.00');
+    pr.getRange('H2:H').setDataValidation(SpreadsheetApp.newDataValidation().requireValueInList(['Mensual', 'Quincenal', 'Semanal'], true).build());
+    pr.setFrozenRows(1);
+    pr.setColumnWidths(1, 16, 120);
+  }
   if (!ss.getSheetByName(HOJA_CFG)) {
     const cfg = ss.insertSheet(HOJA_CFG);
     cfg.getRange('A1:B1').setValues([['Tipo de cambio (S/ por US$)', 3.75]]);
@@ -159,7 +182,7 @@ function aFechaTexto_(v) {
 function leerTodo_() {
   const ss = ss_();
   const sh = ss.getSheetByName(HOJA_MOV);
-  const n = ultimaFila_(sh) - 1;
+  const n = ultimaFila_(sh, [COL.fecha, COL.monto]) - 1;
   const movimientos = [];
   if (n > 0) {
     const vals = sh.getRange(2, 1, n, ENCABEZADOS.length).getValues();
@@ -178,22 +201,22 @@ function leerTodo_() {
         categoria: String(r[COL.categoria - 1] || (tipo === 'Gasto' ? 'Otros gastos' : 'Otros ingresos')),
         nota: String(r[COL.nota - 1] || ''), metodo: String(r[COL.metodo - 1] || ''),
         moneda: moneda, monto: monto, tc: tc, montoPEN: Math.round(monto * tc * 100) / 100,
-        creado: r[COL.creado - 1] instanceof Date ? r[COL.creado - 1].toISOString() : String(r[COL.creado - 1] || '')
+        creado: r[COL.creado - 1] instanceof Date ? r[COL.creado - 1].toISOString() : String(r[COL.creado - 1] || ''),
+        prestamoId: String(r[COL.prestamo - 1] || '')
       });
     });
     // Filas escritas a mano reciben un ID para poder borrarlas desde el formulario
     idsNuevos.forEach(function (x) { sh.getRange(x[0], COL.id).setValue(x[1]); });
   }
-  return { movimientos: movimientos, config: leerConfig_(), hoja: { url: ss.getUrl(), id: ss.getId(), nombre: ss.getName() } };
+  return { movimientos: movimientos, prestamos: leerPrestamos_(), config: leerConfig_(), hoja: { url: ss.getUrl(), id: ss.getId(), nombre: ss.getName() } };
 }
 
 /** Última fila con datos reales (getLastRow no sirve: las ARRAYFORMULA llenan toda la columna). */
-function ultimaFila_(sh) {
+function ultimaFila_(sh, cols) {
   const max = sh.getMaxRows();
-  const f = sh.getRange(1, COL.fecha, max, 1).getValues();
-  const m = sh.getRange(1, COL.monto, max, 1).getValues();
+  const datos = cols.map(function (c) { return sh.getRange(1, c, max, 1).getValues(); });
   for (let i = max - 1; i >= 1; i--) {
-    if (f[i][0] !== '' || m[i][0] !== '') return i + 1;
+    if (datos.some(function (d) { return d[i][0] !== ''; })) return i + 1;
   }
   return 1;
 }
@@ -221,18 +244,18 @@ function agregar_(m) {
   const tc = moneda === 'USD' ? Number(m.tc) : 1;
   if (!(tc > 0)) throw new Error('Tipo de cambio no válido');
   const sh = ss_().getSheetByName(HOJA_MOV);
-  const r = ultimaFila_(sh) + 1;
+  const r = ultimaFila_(sh, [COL.fecha, COL.monto]) + 1;
   const id = String(m.id || Utilities.getUuid().slice(0, 8));
   // C (Mes) y K (Monto S/) las calculan las fórmulas de la fila 1
   sh.getRange(r, COL.id, 1, 2).setValues([[id, new Date(p[0], p[1] - 1, p[2])]]);
   sh.getRange(r, COL.tipo, 1, 7).setValues([[m.tipo === 'Ingreso' ? 'Ingreso' : 'Gasto', String(m.categoria || ''), String(m.nota || ''), String(m.metodo || ''), moneda, monto, tc]]);
-  sh.getRange(r, COL.creado).setValue(new Date());
+  sh.getRange(r, COL.creado, 1, 2).setValues([[new Date(), String(m.prestamoId || '')]]);
 }
 
 function borrar_(id) {
   if (!id) throw new Error('Falta el ID');
   const sh = ss_().getSheetByName(HOJA_MOV);
-  const n = ultimaFila_(sh) - 1;
+  const n = ultimaFila_(sh, [COL.fecha, COL.monto]) - 1;
   if (n < 1) return;
   const ids = sh.getRange(2, COL.id, n, 1).getValues();
   for (let i = ids.length - 1; i >= 0; i--) {
@@ -249,5 +272,67 @@ function guardarConfig_(c) {
     const cats = p.getRange(4, 1, CAT_GASTO.length, 1).getValues();
     const vals = cats.map(function (r) { const v = Number(c.presupuestos[r[0]]); return [v > 0 ? v : 0]; });
     p.getRange(4, 2, vals.length, 1).setValues(vals);
+  }
+}
+
+/* ---------- Préstamos ---------- */
+
+function aFecha_(t) {
+  const p = aFechaTexto_(t).split('-').map(Number);
+  if (p.length !== 3 || !p[0]) throw new Error('Fecha no válida');
+  return new Date(p[0], p[1] - 1, p[2]);
+}
+
+function leerPrestamos_() {
+  const sh = ss_().getSheetByName(HOJA_PRE);
+  const n = ultimaFila_(sh, [PCOL.id, PCOL.entidad]) - 1;
+  if (n < 1) return [];
+  const vals = sh.getRange(2, 1, n, P_ENCABEZADOS.length).getValues();
+  const out = [];
+  vals.forEach(function (r, i) {
+    const cuotas = Number(r[PCOL.cuotas - 1]), cuota = Number(r[PCOL.cuota - 1]);
+    if (!r[PCOL.entidad - 1] || !(cuotas > 0) || !(cuota > 0)) return;
+    let id = String(r[PCOL.id - 1] || '');
+    if (!id) { id = 'p' + Utilities.getUuid().slice(0, 8); sh.getRange(i + 2, PCOL.id).setValue(id); }
+    out.push({
+      id: id, entidad: String(r[PCOL.entidad - 1]), nota: String(r[PCOL.nota - 1] || ''),
+      fecha: aFechaTexto_(r[PCOL.fecha - 1]), monto: Number(r[PCOL.monto - 1]) || 0,
+      cuotas: cuotas, cuota: cuota, frecuencia: String(r[PCOL.frecuencia - 1] || 'Mensual'),
+      primer: aFechaTexto_(r[PCOL.primer - 1])
+    });
+  });
+  return out;
+}
+
+function agregarPrestamo_(p) {
+  if (!p || !String(p.entidad || '').trim()) throw new Error('Falta la entidad');
+  const cuotas = Math.round(Number(p.cuotas)), cuota = Number(p.cuota), monto = Number(p.monto);
+  if (!(monto > 0)) throw new Error('Monto recibido no válido');
+  if (!(cuotas > 0)) throw new Error('Número de cuotas no válido');
+  if (!(cuota > 0)) throw new Error('Monto de cuota no válido');
+  const frec = ['Mensual', 'Quincenal', 'Semanal'].indexOf(p.frecuencia) >= 0 ? p.frecuencia : 'Mensual';
+  const sh = ss_().getSheetByName(HOJA_PRE);
+  const r = ultimaFila_(sh, [PCOL.id, PCOL.entidad]) + 1;
+  const id = String(p.id || ('p' + Utilities.getUuid().slice(0, 8)));
+  sh.getRange(r, 1, 1, 9).setValues([[id, String(p.entidad).trim(), String(p.nota || ''), aFecha_(p.fecha), monto, cuotas, cuota, frec, aFecha_(p.primer)]]);
+  sh.getRange(r, 10, 1, 7).setValues([[
+    '=F' + r + '*G' + r,
+    '=J' + r + '-E' + r,
+    '=SUMIFS(Movimientos!K:K,Movimientos!M:M,A' + r + ')',
+    '=MAX(0,J' + r + '-L' + r + ')',
+    '=COUNTIFS(Movimientos!M:M,A' + r + ')',
+    '=IF(M' + r + '<=0.009,"Pagado","Pendiente")',
+    new Date()
+  ]]);
+}
+
+function borrarPrestamo_(id) {
+  if (!id) throw new Error('Falta el ID');
+  const sh = ss_().getSheetByName(HOJA_PRE);
+  const n = ultimaFila_(sh, [PCOL.id, PCOL.entidad]) - 1;
+  if (n < 1) return;
+  const ids = sh.getRange(2, PCOL.id, n, 1).getValues();
+  for (let i = ids.length - 1; i >= 0; i--) {
+    if (String(ids[i][0]) === String(id)) { sh.deleteRow(i + 2); return; }
   }
 }

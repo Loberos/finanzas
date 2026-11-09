@@ -116,6 +116,18 @@ a.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
 .sheetname a{color:var(--accent)}
 .linkbtn{background:none;border:none;color:var(--accent);padding:0;font-size:13px;font-weight:600;text-decoration:underline}
 .busy{opacity:.6}
+.loans{display:flex;flex-direction:column;gap:12px}
+.loan{border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.loan.done{opacity:.7}
+.loanhead{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap}
+.loanhead strong{font-size:15px}
+.loanfacts{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;font-size:13px}
+.loanfacts span{display:block;color:var(--muted);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.03em}
+.loanactions{display:flex;gap:8px;flex-wrap:wrap}
+.loanactions button{padding:6px 10px;font-size:13px}
+.calc{font-size:13px;color:var(--muted);background:var(--bg);border-radius:8px;padding:8px 10px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+@media (max-width:420px){.row3{grid-template-columns:1fr 1fr}}
 </style>
 </head>
 <body>
@@ -165,6 +177,7 @@ a.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
     <div class="tile"><div class="k">Ingresos</div><div class="v pos" id="tIng">S/ 0.00</div><div class="h" id="tIngN">0 movimientos</div></div>
     <div class="tile"><div class="k">Gastos</div><div class="v neg" id="tGas">S/ 0.00</div><div class="h" id="tGasN">0 movimientos</div></div>
     <div class="tile"><div class="k">Balance</div><div class="v" id="tBal">S/ 0.00</div><div class="h" id="tAho">Tasa de ahorro: —</div></div>
+    <div class="tile"><div class="k">Deuda pendiente</div><div class="v" id="tDeu">S/ 0.00</div><div class="h" id="tDeuH">Sin préstamos activos</div></div>
     <div class="tile"><div class="k">Presupuesto usado</div><div class="v" id="tPre">—</div><div class="h" id="tPreH">Define tus límites abajo</div></div>
   </section>
 
@@ -188,6 +201,9 @@ a.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
             <label for="tc" id="tcWrap">Tipo de cambio<input type="number" id="tc" class="num" step="0.001" min="0.001" inputmode="decimal"></label>
           </div>
           <label for="categoria">Categoría<select id="categoria"></select></label>
+          <label for="prestamoSel" id="prestamoWrap" hidden>¿Es pago de un préstamo?
+            <select id="prestamoSel"></select>
+          </label>
           <label for="metodo">Medio de pago
             <select id="metodo">
               <option>Efectivo</option><option>Yape / Plin</option><option>Tarjeta de débito</option><option>Tarjeta de crédito</option><option>Transferencia</option><option>Otro</option>
@@ -202,6 +218,36 @@ a.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
     </div>
 
     <div class="col">
+      <section class="card" aria-labelledby="lTitle" id="loansCard">
+        <div class="cardhead"><h2 id="lTitle">Préstamos y créditos</h2><span class="tag" id="loanSum"></span></div>
+        <div class="loans" id="loans"></div>
+        <details id="lDetails" style="margin-top:12px">
+          <summary>Registrar un préstamo o crédito</summary>
+          <form id="formPrestamo" novalidate style="margin-top:12px">
+            <div class="row2">
+              <label for="pEntidad">Entidad<input type="text" id="pEntidad" list="entidades" maxlength="60" placeholder="Ej. Yape, Prexpe" required></label>
+              <label for="pFecha">Fecha en que lo recibiste<input type="date" id="pFecha" required></label>
+            </div>
+            <datalist id="entidades"><option>Yape</option><option>Prexpe</option><option>BCP</option><option>Interbank</option><option>BBVA</option><option>Scotiabank</option><option>Caja Huancayo</option><option>Caja Arequipa</option><option>Familiar / amigo</option></datalist>
+            <div class="row3">
+              <label for="pMonto">Monto recibido S/<input type="number" id="pMonto" class="num" step="0.01" min="0.01" inputmode="decimal" required></label>
+              <label for="pCuotas">N° de cuotas<input type="number" id="pCuotas" class="num" step="1" min="1" inputmode="numeric" required></label>
+              <label for="pCuota">Cuota S/<input type="number" id="pCuota" class="num" step="0.01" min="0.01" inputmode="decimal" required></label>
+            </div>
+            <div class="row2">
+              <label for="pFrec">Frecuencia
+                <select id="pFrec"><option>Mensual</option><option>Quincenal</option><option>Semanal</option></select>
+              </label>
+              <label for="pPrimer">Primer vencimiento<input type="date" id="pPrimer" required></label>
+            </div>
+            <label for="pNota">Descripción <span class="hint">(opcional)</span><input type="text" id="pNota" maxlength="140" placeholder="Ej. Crédito para la importación"></label>
+            <div class="calc" id="pCalc">Completa monto, cuotas y cuota para ver cuánto pagarás en total.</div>
+            <button class="primary" type="submit" id="btnPrestamo">Guardar préstamo</button>
+            <div class="msg" id="pMsg" role="status" aria-live="polite"></div>
+          </form>
+        </details>
+      </section>
+
       <section class="card" aria-labelledby="pTitle">
         <div class="cardhead"><h2 id="pTitle">Presupuesto del mes</h2><span class="tag">Gastos convertidos a S/</span></div>
         <div class="budget" id="budget"></div>
@@ -251,6 +297,7 @@ a.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
 
   let conn=null;            // {url, clave}
   let movs=[];
+  let prestamos=[];
   let cfg={tc:3.75, presupuestos:{}};
   let pendingDel=null;
 
@@ -274,6 +321,7 @@ a.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
 
   function aplicar(data){
     movs = Array.isArray(data.movimientos) ? data.movimientos : [];
+    prestamos = Array.isArray(data.prestamos) ? data.prestamos : [];
     if(data.config) cfg = {tc:Number(data.config.tc)||cfg.tc, presupuestos:Object.assign({},data.config.presupuestos||{})};
     if(data.hoja){
       $("lnkSheet").href = data.hoja.url;
@@ -335,7 +383,12 @@ a.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
     $("categoria").innerHTML = (tipo==="Gasto"?CAT_GASTO:CAT_ING).map(c=>`<option>${esc(c)}</option>`).join("");
   }
   function toggleTc(){ $("tcWrap").style.visibility = $("moneda").value==="USD" ? "visible" : "hidden"; }
-  document.querySelectorAll('input[name="tipo"]').forEach(r=>r.addEventListener("change",fillCategorias));
+  document.querySelectorAll('input[name="tipo"]').forEach(r=>r.addEventListener("change",()=>{fillCategorias();togglePrestamo();}));
+  $("categoria").addEventListener("change",togglePrestamo);
+  function togglePrestamo(){
+    const tipo=document.querySelector('input[name="tipo"]:checked').value;
+    $("prestamoWrap").hidden = !(tipo==="Gasto" && $("categoria").value==="Deudas / Tarjetas");
+  }
   $("moneda").addEventListener("change",()=>{ $("tc").value = cfg.tc; toggleTc(); });
   fillCategorias(); toggleTc();
 
@@ -351,14 +404,15 @@ a.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
     if(!(monto>0)){ showMsg("Ingresa un monto mayor que cero.",true); $("monto").focus(); return; }
     if(moneda==="USD" && !(tc>0)){ showMsg("Ingresa el tipo de cambio.",true); $("tc").focus(); return; }
     const mov={id:"m"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),tipo,fecha,mes:fecha.slice(0,7),monto,moneda,tc,
-      montoPEN:round2(monto*tc),categoria:$("categoria").value,metodo:$("metodo").value,nota:$("nota").value.trim(),creado:new Date().toISOString()};
+      montoPEN:round2(monto*tc),categoria:$("categoria").value,metodo:$("metodo").value,nota:$("nota").value.trim(),creado:new Date().toISOString(),
+      prestamoId: $("prestamoWrap").hidden ? "" : $("prestamoSel").value};
     $("btnSave").disabled=true; showMsg("Guardando en la hoja…");
     try{
       const data = await api("POST",{accion:"agregar",mov});
       if(mov.mes!==$("mes").value) $("mes").value=mov.mes;
       aplicar(data);
       showMsg(`${tipo} de ${fmtCur(monto,moneda)} guardado en la hoja.`);
-      $("monto").value=""; $("nota").value=""; $("monto").focus();
+      $("monto").value=""; $("nota").value=""; $("prestamoSel").value=""; $("monto").focus();
     }catch(err){ showMsg("No se guardó: "+err.message,true); }
     finally{ $("btnSave").disabled=false; }
   });
@@ -394,6 +448,7 @@ a.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
 
   // ---------- render ----------
   function render(){
+    renderPrestamos();
     const list = movs.filter(x=>x.mes===$("mes").value);
     let ing=0, gas=0, nI=0, nG=0; const porCat={};
     list.forEach(x=>{ if(x.tipo==="Ingreso"){ing+=x.montoPEN;nI++;} else {gas+=x.montoPEN;nG++; porCat[x.categoria]=(porCat[x.categoria]||0)+x.montoPEN;} });
@@ -438,6 +493,120 @@ a.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
         <td class="r"><button type="button" class="del${pendingDel===x.id?" confirm":""}" data-id="${esc(x.id)}">${pendingDel===x.id?"¿Eliminar?":"Borrar"}</button></td></tr>`;
     }).join("");
   }
+
+  // ---------- préstamos ----------
+  const DIA=86400000;
+  function parseD(t){ const [y,m,d]=String(t||"").split("-").map(Number); return y?new Date(y,m-1,d):null; }
+  function fmtD(d){ return d? pad(d.getDate())+"/"+pad(d.getMonth()+1)+"/"+d.getFullYear() : "—"; }
+  function addPeriodo(d,frec,k){
+    const x=new Date(d);
+    if(frec==="Semanal") x.setDate(x.getDate()+7*k);
+    else if(frec==="Quincenal") x.setDate(x.getDate()+15*k);
+    else { const day=x.getDate(); x.setDate(1); x.setMonth(x.getMonth()+k); const last=new Date(x.getFullYear(),x.getMonth()+1,0).getDate(); x.setDate(Math.min(day,last)); }
+    return x;
+  }
+  function estadoPrestamo(p){
+    const pagos=movs.filter(m=>m.prestamoId===p.id);
+    const pagado=round2(pagos.reduce((a,m)=>a+m.montoPEN,0));
+    const total=round2(p.cuotas*p.cuota);
+    const saldo=Math.max(0,round2(total-pagado));
+    const nPagadas=Math.min(p.cuotas,Math.floor((pagado+0.005)/p.cuota));
+    const prox = saldo>0 && parseD(p.primer) ? addPeriodo(parseD(p.primer),p.frecuencia,nPagadas) : null;
+    const hoy=parseD(today());
+    const dias = prox ? Math.round((prox-hoy)/DIA) : null;
+    return {pagado,total,saldo,nPagadas,prox,dias,interes:round2(total-p.monto),pagos:pagos.length};
+  }
+  function renderPrestamos(){
+    const activos=[];
+    let deuda=0, proxima=null;
+    const html = prestamos.slice().sort((a,b)=>(a.fecha||"").localeCompare(b.fecha||"")).map(p=>{
+      const e=estadoPrestamo(p);
+      if(e.saldo>0){ activos.push(p); deuda+=e.saldo; if(e.prox && (!proxima||e.prox<proxima.d)) proxima={d:e.prox,p}; }
+      let pill;
+      if(e.saldo<=0) pill='<span class="pill ok">Pagado</span>';
+      else if(e.dias<0) pill='<span class="pill bad">Cuota vencida hace '+(-e.dias)+(e.dias===-1?" día":" días")+'</span>';
+      else if(e.dias<=5) pill='<span class="pill warn">'+(e.dias===0?"Vence hoy":"Vence en "+e.dias+(e.dias===1?" día":" días"))+'</span>';
+      else pill='<span class="pill ok">Al día</span>';
+      const pct = e.total>0 ? Math.min(100,e.pagado/e.total*100) : 0;
+      const del = pendingDel===p.id;
+      return `<div class="loan${e.saldo<=0?" done":""}">
+        <div class="loanhead"><div><strong>${esc(p.entidad)}</strong>${p.nota?' · <span class="tag">'+esc(p.nota)+'</span>':""}<br><span class="tag">Recibido ${fmtD(parseD(p.fecha))} · ${esc(p.frecuencia)}</span></div>${pill}</div>
+        <div class="bar" role="img" aria-label="Pagado ${Math.round(pct)}%"><i style="width:${pct}%"></i></div>
+        <div class="loanfacts">
+          <div><span>Saldo pendiente</span><b class="num">${fmtPEN(e.saldo)}</b></div>
+          <div><span>Cuotas pagadas</span><b class="num">${e.nPagadas} de ${p.cuotas}</b></div>
+          <div><span>Próxima cuota</span><b class="num">${e.prox?fmtD(e.prox):"—"}</b></div>
+          <div><span>Cuota</span><b class="num">${fmtPEN(p.cuota)}</b></div>
+          <div><span>Recibiste / pagarás</span><b class="num">${fmtPEN(p.monto)} / ${fmtPEN(e.total)}</b></div>
+          <div><span>Interés y costos</span><b class="num ${e.interes>0?"neg":""}">${fmtPEN(e.interes)}</b></div>
+        </div>
+        <div class="loanactions">
+          ${e.saldo>0?`<button type="button" class="primary" data-pagar="${esc(p.id)}">Pagar cuota ${Math.min(e.nPagadas+1,p.cuotas)}</button>`:""}
+          <button type="button" class="del${del?" confirm":""}" data-borrarp="${esc(p.id)}">${del?"¿Eliminar préstamo?":"Eliminar"}</button>
+        </div>
+      </div>`;
+    }).join("");
+    $("loans").innerHTML = html || '<div class="empty">No tienes préstamos registrados. Usa "Registrar un préstamo o crédito" para agregar los de Yape, Prexpe u otros.</div>';
+    $("loanSum").textContent = activos.length ? activos.length+(activos.length===1?" activo":" activos") : "";
+    $("tDeu").textContent=fmtPEN(deuda); $("tDeu").className="v"+(deuda>0?" neg":"");
+    $("tDeuH").textContent = proxima ? "Próxima: "+proxima.p.entidad+" el "+fmtD(proxima.d) : (prestamos.length?"Todo pagado":"Sin préstamos activos");
+    // opciones del selector en el formulario principal
+    const sel=$("prestamoSel"), prev=sel.value;
+    sel.innerHTML = '<option value="">No, es otro gasto</option>' + activos.map(p=>`<option value="${esc(p.id)}">${esc(p.entidad)}${p.nota?" · "+esc(p.nota):""} (cuota ${fmtPEN(p.cuota)})</option>`).join("");
+    if([...sel.options].some(o=>o.value===prev)) sel.value=prev;
+  }
+
+  $("loans").addEventListener("click", async e=>{
+    const pb=e.target.closest("[data-pagar]");
+    if(pb){
+      const p=prestamos.find(x=>x.id===pb.dataset.pagar); if(!p) return;
+      const est=estadoPrestamo(p);
+      $("tipoG").checked=true; fillCategorias(); $("categoria").value="Deudas / Tarjetas"; togglePrestamo();
+      $("prestamoSel").value=p.id; $("moneda").value="PEN"; toggleTc();
+      $("monto").value=Math.min(p.cuota,est.saldo).toFixed(2); $("fecha").value=today();
+      $("nota").value="Cuota "+Math.min(est.nPagadas+1,p.cuotas)+"/"+p.cuotas+" "+p.entidad;
+      showMsg("Revisa el monto y el medio de pago, y pulsa Guardar.");
+      $("fTitle").scrollIntoView({behavior:"smooth",block:"start"}); $("monto").focus({preventScroll:true});
+      return;
+    }
+    const db=e.target.closest("[data-borrarp]");
+    if(db){
+      const id=db.dataset.borrarp;
+      if(pendingDel!==id){ pendingDel=id; renderPrestamos(); return; }
+      pendingDel=null; db.disabled=true; db.textContent="Eliminando…";
+      try{ aplicar(await api("POST",{accion:"prestamo_borrar",id})); setStatus("Préstamo eliminado. Los pagos que hiciste siguen en Movimientos como gastos.","ok"); }
+      catch(err){ setStatus("No se pudo eliminar: "+err.message,"err"); renderPrestamos(); }
+    }
+  });
+
+  function calcPrestamo(){
+    const m=Number($("pMonto").value), n=Math.round(Number($("pCuotas").value)), c=Number($("pCuota").value);
+    if(!(m>0&&n>0&&c>0)){ $("pCalc").textContent="Completa monto, cuotas y cuota para ver cuánto pagarás en total."; return; }
+    const tot=round2(n*c), int=round2(tot-m);
+    $("pCalc").innerHTML = `Pagarás <b class="num">${fmtPEN(tot)}</b> en ${n} ${n===1?"cuota":"cuotas"}. Interés y costos: <b class="num ${int>0?"neg":""}">${fmtPEN(int)}</b>`+(m>0&&int>0?` (${Math.round(int/m*100)}% de lo recibido).`:".");
+  }
+  ["pMonto","pCuotas","pCuota"].forEach(id=>$(id).addEventListener("input",calcPrestamo));
+  $("pFecha").value=today();
+
+  $("formPrestamo").addEventListener("submit", async e=>{
+    e.preventDefault();
+    const pm=$("pMsg"); const err=t=>{ pm.textContent=t; pm.className="msg err"; };
+    const prestamo={entidad:$("pEntidad").value.trim(),fecha:$("pFecha").value,monto:round2($("pMonto").value),
+      cuotas:Math.round(Number($("pCuotas").value)),cuota:round2($("pCuota").value),frecuencia:$("pFrec").value,primer:$("pPrimer").value,nota:$("pNota").value.trim()};
+    if(!prestamo.entidad) return err("Escribe la entidad (Yape, Prexpe…).");
+    if(!prestamo.fecha) return err("Elige la fecha en que recibiste el dinero.");
+    if(!(prestamo.monto>0)) return err("Ingresa el monto recibido.");
+    if(!(prestamo.cuotas>0)) return err("Ingresa el número de cuotas.");
+    if(!(prestamo.cuota>0)) return err("Ingresa el monto de cada cuota.");
+    if(!prestamo.primer) return err("Elige la fecha del primer vencimiento.");
+    $("btnPrestamo").disabled=true; pm.textContent="Guardando en la hoja…"; pm.className="msg";
+    try{
+      aplicar(await api("POST",{accion:"prestamo_agregar",prestamo}));
+      pm.textContent=`Préstamo de ${prestamo.entidad} guardado.`;
+      ["pEntidad","pMonto","pCuotas","pCuota","pPrimer","pNota"].forEach(id=>$(id).value=""); calcPrestamo();
+    }catch(e2){ err("No se guardó: "+e2.message); }
+    finally{ $("btnPrestamo").disabled=false; }
+  });
 
   function renderBudgetEditor(){
     const pres=cfg.presupuestos||{};
