@@ -3,12 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
 <title>Mis Finanzas</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-/* Layout: libreta contable — resumen arriba, formulario a la izquierda, presupuesto y movimientos a la derecha */
+/* Layout: tema claro; pestañas Resumen · Registrar · Movimientos · Préstamos · Presupuesto */
 :root{
   --bg:#f3f5f8; --surface:#ffffff; --ink:#16233f; --muted:#5d6a82; --line:#dde2ea;
   --accent:#1f4fd1; --accent-ink:#ffffff;
@@ -17,22 +18,6 @@
   --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
   --f-num:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
   color-scheme:light;
-}
-@media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]){
-    --bg:#0f1524; --surface:#172036; --ink:#e7ecf6; --muted:#97a3bb; --line:#2a3550;
-    --accent:#7ea2ff; --accent-ink:#0d1427;
-    --good:#4cc795; --warn:#f0ac45; --bad:#ff7d72;
-    --good-bg:#15352b; --warn-bg:#3a2c14; --bad-bg:#3d1c1c;
-    color-scheme:dark;
-  }
-}
-:root[data-theme="dark"]{
-  --bg:#0f1524; --surface:#172036; --ink:#e7ecf6; --muted:#97a3bb; --line:#2a3550;
-  --accent:#7ea2ff; --accent-ink:#0d1427;
-  --good:#4cc795; --warn:#f0ac45; --bad:#ff7d72;
-  --good-bg:#15352b; --warn-bg:#3a2c14; --bad-bg:#3d1c1c;
-  color-scheme:dark;
 }
 *{box-sizing:border-box}
 html,body{margin:0}
@@ -52,10 +37,11 @@ button.primary{background:var(--accent);color:var(--accent-ink);border-color:var
 button:disabled{opacity:.5;cursor:not-allowed}
 .status{font-size:13px;padding:8px 12px;border-radius:8px;background:var(--warn-bg);color:var(--warn)}
 .status[hidden]{display:none}
-.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+@media (max-width:480px){.tabs button{padding:10px 10px;font-size:14px}.tile{padding:12px}}
 .tile{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
 .tile .k{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
-.tile .v{font-family:var(--f-num);font-size:22px;font-weight:600;margin-top:4px;font-variant-numeric:tabular-nums}
+.tile .v{font-family:var(--f-num);font-size:clamp(17px,4.4vw,22px);white-space:nowrap;font-weight:600;margin-top:4px;font-variant-numeric:tabular-nums}
 .tile .h{font-size:12px;color:var(--muted);margin-top:2px}
 .pos{color:var(--good)} .neg{color:var(--bad)}
 .grid{display:grid;grid-template-columns:minmax(300px,380px) 1fr;gap:18px;align-items:start}
@@ -115,7 +101,22 @@ a.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
 .sheetname{font-size:13px;color:var(--muted)}
 .sheetname a{color:var(--accent)}
 .linkbtn{background:none;border:none;color:var(--accent);padding:0;font-size:13px;font-weight:600;text-decoration:underline}
-.busy{opacity:.6}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none;margin-bottom:18px}
+.tabs::-webkit-scrollbar{display:none}
+.tabs button{border:none;background:none;border-radius:8px 8px 0 0;padding:10px 14px;font-weight:600;color:var(--muted);white-space:nowrap;border-bottom:3px solid transparent;margin-bottom:-1px}
+.tabs button:hover{color:var(--ink);background:var(--surface)}
+.tabs button[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent);background:var(--surface)}
+.tabs .count{display:inline-block;min-width:18px;padding:0 6px;border-radius:999px;background:var(--bad-bg);color:var(--bad);font-size:11px;line-height:18px;text-align:center;margin-left:4px}
+.panel{display:flex;flex-direction:column;gap:18px}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,380px),1fr));gap:18px;align-items:start}
+.narrow{max-width:520px}
+.tilebtn{text-align:left;font:inherit;color:inherit;cursor:pointer;width:100%}
+.tilebtn:hover{border-color:var(--accent)}
+.recent{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.recent li{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line);font-size:14px}
+.recent li:last-child{border-bottom:none}
+.card h2{margin-bottom:12px}
+.cardhead h2{margin:0}
 .loans{display:flex;flex-direction:column;gap:12px}
 .loan{border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
 .loan.done{opacity:.7}
@@ -173,17 +174,39 @@ a.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
   </section>
 
   <div id="app" hidden>
-  <section class="tiles" aria-label="Resumen del mes">
-    <div class="tile"><div class="k">Ingresos</div><div class="v pos" id="tIng">S/ 0.00</div><div class="h" id="tIngN">0 movimientos</div></div>
-    <div class="tile"><div class="k">Gastos</div><div class="v neg" id="tGas">S/ 0.00</div><div class="h" id="tGasN">0 movimientos</div></div>
-    <div class="tile"><div class="k">Balance</div><div class="v" id="tBal">S/ 0.00</div><div class="h" id="tAho">Tasa de ahorro: —</div></div>
-    <div class="tile"><div class="k">Deuda pendiente</div><div class="v" id="tDeu">S/ 0.00</div><div class="h" id="tDeuH">Sin préstamos activos</div></div>
-    <div class="tile"><div class="k">Presupuesto usado</div><div class="v" id="tPre">—</div><div class="h" id="tPreH">Define tus límites abajo</div></div>
-  </section>
+    <nav class="tabs" role="tablist" aria-label="Secciones">
+      <button type="button" role="tab" id="tab-resumen" aria-controls="panel-resumen" data-tab="resumen">Resumen</button>
+      <button type="button" role="tab" id="tab-registrar" aria-controls="panel-registrar" data-tab="registrar">Registrar</button>
+      <button type="button" role="tab" id="tab-movimientos" aria-controls="panel-movimientos" data-tab="movimientos">Movimientos</button>
+      <button type="button" role="tab" id="tab-prestamos" aria-controls="panel-prestamos" data-tab="prestamos">Préstamos <span class="count" id="loanCount" hidden></span></button>
+      <button type="button" role="tab" id="tab-presupuesto" aria-controls="panel-presupuesto" data-tab="presupuesto">Presupuesto</button>
+    </nav>
 
-  <div class="grid" style="margin-top:18px">
-    <div class="col">
-      <section class="card" aria-labelledby="fTitle">
+    <!-- RESUMEN -->
+    <section class="panel" role="tabpanel" id="panel-resumen" aria-labelledby="tab-resumen">
+      <div class="tiles" aria-label="Resumen del mes">
+        <div class="tile"><div class="k">Ingresos</div><div class="v pos" id="tIng">S/ 0.00</div><div class="h" id="tIngN">0 movimientos</div></div>
+        <div class="tile"><div class="k">Gastos</div><div class="v neg" id="tGas">S/ 0.00</div><div class="h" id="tGasN">0 movimientos</div></div>
+        <div class="tile"><div class="k">Balance</div><div class="v" id="tBal">S/ 0.00</div><div class="h" id="tAho">Tasa de ahorro: —</div></div>
+        <button type="button" class="tile tilebtn" data-goto="prestamos"><div class="k">Deuda pendiente</div><div class="v" id="tDeu">S/ 0.00</div><div class="h" id="tDeuH">Sin préstamos activos</div></button>
+        <button type="button" class="tile tilebtn" data-goto="presupuesto"><div class="k">Presupuesto usado</div><div class="v" id="tPre">—</div><div class="h" id="tPreH">Define tus límites</div></button>
+      </div>
+      <div class="cols">
+        <section class="card" aria-labelledby="rPresTitle">
+          <div class="cardhead"><h2 id="rPresTitle">Presupuesto del mes</h2><button type="button" class="linkbtn" data-goto="presupuesto">Editar límites</button></div>
+          <div class="budget" id="budget"></div>
+        </section>
+        <section class="card" aria-labelledby="rUltTitle">
+          <div class="cardhead"><h2 id="rUltTitle">Últimos movimientos</h2><button type="button" class="linkbtn" data-goto="movimientos">Ver todos</button></div>
+          <ul class="recent" id="recent"></ul>
+          <button type="button" class="primary" data-goto="registrar" style="margin-top:12px">Registrar movimiento</button>
+        </section>
+      </div>
+    </section>
+
+    <!-- REGISTRAR -->
+    <section class="panel" role="tabpanel" id="panel-registrar" aria-labelledby="tab-registrar" hidden>
+      <section class="card narrow" aria-labelledby="fTitle">
         <h2 id="fTitle">Nuevo movimiento</h2>
         <form id="form" novalidate>
           <div class="seg" role="radiogroup" aria-label="Tipo de movimiento">
@@ -214,16 +237,37 @@ a.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
           <div class="msg" id="msg" role="status" aria-live="polite"></div>
         </form>
       </section>
-      <button type="button" class="linkbtn" id="btnDesconectar">Cambiar de hoja o de clave</button>
-    </div>
+    </section>
 
-    <div class="col">
-      <section class="card" aria-labelledby="lTitle" id="loansCard">
-        <div class="cardhead"><h2 id="lTitle">Préstamos y créditos</h2><span class="tag" id="loanSum"></span></div>
-        <div class="loans" id="loans"></div>
-        <details id="lDetails" style="margin-top:12px">
-          <summary>Registrar un préstamo o crédito</summary>
-          <form id="formPrestamo" novalidate style="margin-top:12px">
+    <!-- MOVIMIENTOS -->
+    <section class="panel" role="tabpanel" id="panel-movimientos" aria-labelledby="tab-movimientos" hidden>
+      <section class="card" aria-labelledby="mTitle">
+        <div class="cardhead">
+          <h2 id="mTitle">Movimientos del mes</h2>
+          <select id="filtro" aria-label="Filtrar movimientos" style="width:auto">
+            <option value="">Todos</option><option value="Gasto">Solo gastos</option><option value="Ingreso">Solo ingresos</option>
+          </select>
+        </div>
+        <div class="tablewrap">
+          <table>
+            <thead><tr><th>Fecha</th><th>Detalle</th><th class="r">Monto</th><th class="r">En S/</th><th></th></tr></thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+        <div class="empty" id="empty">Aún no hay movimientos este mes. Regístralos en la pestaña Registrar.</div>
+      </section>
+    </section>
+
+    <!-- PRÉSTAMOS -->
+    <section class="panel" role="tabpanel" id="panel-prestamos" aria-labelledby="tab-prestamos" hidden>
+      <div class="cols">
+        <section class="card" aria-labelledby="lTitle" id="loansCard">
+          <div class="cardhead"><h2 id="lTitle">Mis préstamos y créditos</h2><span class="tag" id="loanSum"></span></div>
+          <div class="loans" id="loans"></div>
+        </section>
+        <section class="card" aria-labelledby="lNewTitle">
+          <h2 id="lNewTitle">Registrar un préstamo o crédito</h2>
+          <form id="formPrestamo" novalidate>
             <div class="row2">
               <label for="pEntidad">Entidad<input type="text" id="pEntidad" list="entidades" maxlength="60" placeholder="Ej. Yape, Prexpe" required></label>
               <label for="pFecha">Fecha en que lo recibiste<input type="date" id="pFecha" required></label>
@@ -245,39 +289,30 @@ a.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
             <button class="primary" type="submit" id="btnPrestamo">Guardar préstamo</button>
             <div class="msg" id="pMsg" role="status" aria-live="polite"></div>
           </form>
-        </details>
-      </section>
+        </section>
+      </div>
+    </section>
 
-      <section class="card" aria-labelledby="pTitle">
-        <div class="cardhead"><h2 id="pTitle">Presupuesto del mes</h2><span class="tag">Gastos convertidos a S/</span></div>
-        <div class="budget" id="budget"></div>
-        <details id="bDetails">
-          <summary>Editar límites por categoría</summary>
+    <!-- PRESUPUESTO -->
+    <section class="panel" role="tabpanel" id="panel-presupuesto" aria-labelledby="tab-presupuesto" hidden>
+      <div class="cols">
+        <section class="card" aria-labelledby="pTitle">
+          <div class="cardhead"><h2 id="pTitle">Cómo vas este mes</h2><span class="tag">Gastos convertidos a S/</span></div>
+          <div class="budget" id="budget2"></div>
+        </section>
+        <section class="card" aria-labelledby="bTitle">
+          <h2 id="bTitle">Límites por categoría</h2>
+          <p class="hint" style="margin:0 0 4px">Deja en blanco las categorías sin límite. Se aplican a todos los meses.</p>
           <div class="bedit" id="bEdit"></div>
           <div class="foot" style="margin-top:12px">
             <button type="button" id="btnBudget" class="primary">Guardar presupuesto</button>
             <span class="msg" id="bMsg" role="status" aria-live="polite"></span>
           </div>
-        </details>
-      </section>
+        </section>
+      </div>
+    </section>
 
-      <section class="card" aria-labelledby="mTitle">
-        <div class="cardhead">
-          <h2 id="mTitle">Movimientos del mes</h2>
-          <select id="filtro" aria-label="Filtrar movimientos" style="width:auto">
-            <option value="">Todos</option><option value="Gasto">Solo gastos</option><option value="Ingreso">Solo ingresos</option>
-          </select>
-        </div>
-        <div class="tablewrap">
-          <table>
-            <thead><tr><th>Fecha</th><th>Detalle</th><th class="r">Monto</th><th class="r">En S/</th><th></th></tr></thead>
-            <tbody id="tbody"></tbody>
-          </table>
-        </div>
-        <div class="empty" id="empty">Aún no hay movimientos este mes. Registra el primero con el formulario.</div>
-      </section>
-    </div>
-  </div>
+    <p style="margin-top:18px"><button type="button" class="linkbtn" id="btnDesconectar">Cambiar de hoja o de clave</button></p>
   </div>
 </div>
 
@@ -333,7 +368,7 @@ a.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
     }
     if(document.activeElement!==$("tcDefault")) $("tcDefault").value=cfg.tc;
     if(document.activeElement!==$("tc")) $("tc").value=cfg.tc;
-    if(!$("bDetails").open) renderBudgetEditor();
+    if(!$("panel-presupuesto").contains(document.activeElement)) renderBudgetEditor();
     render();
   }
 
@@ -341,10 +376,8 @@ a.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
 
   async function cargar(silencioso){
     if(!silencioso) setStatus("Leyendo tu hoja de Google Sheets…","info");
-    $("app").classList.add("busy");
     try{ aplicar(await api("GET")); setStatus("",null); return true; }
     catch(e){ setStatus(e.message,"err"); return false; }
-    finally{ $("app").classList.remove("busy"); }
   }
 
   function mostrar(conectado){
@@ -467,11 +500,11 @@ a.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
       const p = gastoPres/totalPres;
       $("tPre").textContent=Math.round(p*100)+"%"; $("tPre").className="v "+(p>1?"neg":"");
       $("tPreH").textContent=fmtPEN(gastoPres)+" de "+fmtPEN(totalPres);
-    } else { $("tPre").textContent="—"; $("tPre").className="v"; $("tPreH").textContent="Define tus límites abajo"; }
+    } else { $("tPre").textContent="—"; $("tPre").className="v"; $("tPreH").textContent="Define tus límites"; }
 
     const cats = CAT_GASTO.filter(c=>(pres[c]>0)||(porCat[c]>0));
     Object.keys(porCat).forEach(c=>{ if(!cats.includes(c)) cats.push(c); });
-    $("budget").innerHTML = cats.length ? cats.map(c=>{
+    $("budget").innerHTML = $("budget2").innerHTML = cats.length ? cats.map(c=>{
       const lim=Number(pres[c])||0, g=porCat[c]||0;
       let cls="", pill;
       if(lim>0){ const p=g/lim; cls=p>1?"bad":p>=0.8?"warn":""; pill=p>1?'<span class="pill bad">Excedido</span>':p>=0.8?'<span class="pill warn">Cerca del límite</span>':'<span class="pill ok">OK</span>'; }
@@ -480,7 +513,13 @@ a.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
       return `<div class="brow"><div class="bname">${esc(c)}<br>${pill}</div>
         <div class="bar" role="img" aria-label="${esc(c)}: ${lim>0?Math.round(g/lim*100)+"% usado":"sin límite"}"><i class="${lim>0?cls:"warn"}" style="width:${w}%"></i></div>
         <div class="bval num">${fmtPEN(g)}<br><span class="tag">${lim>0?"de "+fmtPEN(lim):"—"}</span></div></div>`;
-    }).join("") : '<div class="empty">Sin gastos ni límites este mes. Abre "Editar límites por categoría" para fijar tu presupuesto.</div>';
+    }).join("") : '<div class="empty">Sin gastos ni límites este mes. Fija tus límites en la pestaña Presupuesto.</div>';
+
+    const recientes = list.slice().sort((a,b)=>(b.fecha+(b.creado||"")).localeCompare(a.fecha+(a.creado||""))).slice(0,6);
+    $("recent").innerHTML = recientes.length ? recientes.map(x=>{
+      const [y,m,d]=x.fecha.split("-");
+      return `<li><span><span class="num tag">${d}/${m}</span> ${esc(x.categoria)}${x.nota?' <span class="tag">· '+esc(x.nota)+'</span>':""}</span><b class="num ${x.tipo==="Ingreso"?"pos":"neg"}">${x.tipo==="Ingreso"?"+":"−"}${fmtPEN(x.montoPEN)}</b></li>`;
+    }).join("") : '<li class="tag">Aún no hay movimientos este mes.</li>';
 
     const f=$("filtro").value;
     const rows = list.filter(x=>!f||x.tipo===f).sort((a,b)=> (b.fecha+(b.creado||"")).localeCompare(a.fecha+(a.creado||"")));
@@ -549,6 +588,8 @@ a.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
       </div>`;
     }).join("");
     $("loans").innerHTML = html || '<div class="empty">No tienes préstamos registrados. Usa "Registrar un préstamo o crédito" para agregar los de Yape, Prexpe u otros.</div>';
+    const alertas = activos.filter(p=>{ const e=estadoPrestamo(p); return e.dias!==null && e.dias<=5; }).length;
+    $("loanCount").hidden = !alertas; $("loanCount").textContent = alertas; $("loanCount").title = alertas ? alertas+" cuota(s) por vencer o vencidas" : "";
     $("loanSum").textContent = activos.length ? activos.length+(activos.length===1?" activo":" activos") : "";
     $("tDeu").textContent=fmtPEN(deuda); $("tDeu").className="v"+(deuda>0?" neg":"");
     $("tDeuH").textContent = proxima ? "Próxima: "+proxima.p.entidad+" el "+fmtD(proxima.d) : (prestamos.length?"Todo pagado":"Sin préstamos activos");
@@ -568,7 +609,7 @@ a.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
       $("monto").value=Math.min(p.cuota,est.saldo).toFixed(2); $("fecha").value=today();
       $("nota").value="Cuota "+Math.min(est.nPagadas+1,p.cuotas)+"/"+p.cuotas+" "+p.entidad;
       showMsg("Revisa el monto y el medio de pago, y pulsa Guardar.");
-      $("fTitle").scrollIntoView({behavior:"smooth",block:"start"}); $("monto").focus({preventScroll:true});
+      showTab("registrar"); $("monto").focus();
       return;
     }
     const db=e.target.closest("[data-borrarp]");
@@ -637,9 +678,32 @@ a.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
     $("bEdit").innerHTML = CAT_GASTO.map((c,i)=>`<label for="b${i}">${esc(c)}<input type="number" class="num" id="b${i}" data-cat="${esc(c)}" min="0" step="1" inputmode="decimal" placeholder="0" value="${pres[c]?pres[c]:""}"></label>`).join("");
   }
 
+  // ---------- pestañas ----------
+  const TABS=["resumen","registrar","movimientos","prestamos","presupuesto"];
+  function showTab(name, noHash){
+    if(!TABS.includes(name)) name="resumen";
+    TABS.forEach(t=>{
+      const on=t===name;
+      $("tab-"+t).setAttribute("aria-selected",on?"true":"false");
+      $("tab-"+t).tabIndex=on?0:-1;
+      $("panel-"+t).hidden=!on;
+    });
+    if(!noHash && location.hash!=="#"+name){ try{ history.replaceState(null,"","#"+name); }catch(e){ location.hash=name; } }
+  }
+  document.querySelector(".tabs").addEventListener("click",e=>{ const b=e.target.closest("[data-tab]"); if(b) showTab(b.dataset.tab); });
+  document.querySelector(".tabs").addEventListener("keydown",e=>{
+    if(e.key!=="ArrowRight"&&e.key!=="ArrowLeft") return;
+    const cur=TABS.findIndex(t=>$("tab-"+t).getAttribute("aria-selected")==="true");
+    const next=TABS[(cur+(e.key==="ArrowRight"?1:TABS.length-1))%TABS.length];
+    showTab(next); $("tab-"+next).focus();
+  });
+  $("app").addEventListener("click",e=>{ const g=e.target.closest("[data-goto]"); if(g){ showTab(g.dataset.goto); window.scrollTo(0,0); } });
+  window.addEventListener("hashchange",()=>showTab(location.hash.slice(1),true));
+
   // ---------- inicio ----------
   renderBudgetEditor(); render();
   conn = loadConn();
+  showTab(location.hash.slice(1),true);
   if(conn){ mostrar(true); cargar(false); }
   else mostrar(false);
   // Si editas la hoja a mano, al volver a la pestaña se actualiza
