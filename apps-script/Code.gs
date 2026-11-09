@@ -4,7 +4,11 @@
  * Esta hoja de cálculo es la base de datos del formulario.
  * Pega este código en Extensiones → Apps Script de tu hoja,
  * cambia la CLAVE y publícalo como "Aplicación web".
+ *
+ * Versión 2: envío en lote, edición en el mismo lugar y orden sin reescribir filas.
  */
+
+const VERSION = 2;
 
 // Clave secreta: el formulario la envía en cada pedido. Cámbiala por una tuya.
 const CLAVE = 'CAMBIA_ESTA_CLAVE';
@@ -42,18 +46,28 @@ function doPost(e) {
     const lock = LockService.getScriptLock();
     lock.waitLock(20000);
     try {
-      if (body.accion === 'agregar') agregar_(body.mov);
-      else if (body.accion === 'borrar') borrar_(body.id);
-      else if (body.accion === 'config') guardarConfig_(body.config);
-      else if (body.accion === 'prestamo_agregar') agregarPrestamo_(body.prestamo);
-      else if (body.accion === 'prestamo_borrar') borrarPrestamo_(body.id);
-      else throw new Error('Acción desconocida');
+      // "lote": varios pasos en una sola llamada, en orden; se responde una sola vez.
+      const pasos = body.accion === 'lote' ? (body.pasos || []) : [body];
+      pasos.forEach(ejecutar_);
       SpreadsheetApp.flush();
     } finally {
       lock.releaseLock();
     }
     return leerTodo_();
   });
+}
+
+function ejecutar_(b) {
+  switch (b.accion) {
+    case 'agregar': return agregar_(b.mov);
+    case 'editar': return editar_(b.mov);
+    case 'borrar': return borrar_(b.id);
+    case 'reordenar': return reordenar_(b.items);
+    case 'config': return guardarConfig_(b.config);
+    case 'prestamo_agregar': return agregarPrestamo_(b.prestamo);
+    case 'prestamo_borrar': return borrarPrestamo_(b.id);
+    default: throw new Error('Acción desconocida');
+  }
 }
 
 /** Ejecútalo una vez desde el editor para crear las pestañas y dar permisos. */
@@ -67,12 +81,30 @@ function configurar() {
 function responder_(fn) {
   let out;
   try {
-    configurar_();
-    out = Object.assign({ ok: true }, fn());
+    configurarSiHaceFalta_();
+    try {
+      out = fn();
+    } catch (err) {
+      // Si alguien borró o renombró una pestaña, se vuelve a crear y se reintenta una vez.
+      if (!/null|undefined/.test(String(err && err.message))) throw err;
+      PropertiesService.getScriptProperties().deleteProperty('hoja_lista');
+      configurarSiHaceFalta_();
+      out = fn();
+    }
+    out = Object.assign({ ok: true, version: VERSION }, out);
   } catch (err) {
-    out = { ok: false, error: String(err && err.message || err) };
+    out = { ok: false, version: VERSION, error: String(err && err.message || err) };
   }
   return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
+}
+
+/** Revisa y crea las pestañas solo la primera vez (no en cada llamada). */
+function configurarSiHaceFalta_() {
+  const props = PropertiesService.getScriptProperties();
+  const marca = ss_().getId() + ':' + VERSION;
+  if (props.getProperty('hoja_lista') === marca) return;
+  configurar_();
+  props.setProperty('hoja_lista', marca);
 }
 
 function verificarClave_(c) {
@@ -214,11 +246,22 @@ function leerTodo_() {
 /** Última fila con datos reales (getLastRow no sirve: las ARRAYFORMULA llenan toda la columna). */
 function ultimaFila_(sh, cols) {
   const max = sh.getMaxRows();
-  const datos = cols.map(function (c) { return sh.getRange(1, c, max, 1).getValues(); });
-  for (let i = max - 1; i >= 1; i--) {
-    if (datos.some(function (d) { return d[i][0] !== ''; })) return i + 1;
-  }
-  return 1;
+  let ultima = 1;
+  cols.forEach(function (c) {
+    const abajo = sh.getRange(max, c);
+    const r = abajo.getValue() !== '' ? max : abajo.getNextDataCell(SpreadsheetApp.Direction.UP).getRow();
+    if (r > ultima) ultima = r;
+  });
+  return ultima;
+}
+
+/** Fila (1-based) de cada ID en la columna A, en una sola lectura. */
+function filasPorId_(sh, cols) {
+  const n = ultimaFila_(sh, cols) - 1;
+  const mapa = {};
+  if (n < 1) return mapa;
+  sh.getRange(2, 1, n, 1).getValues().forEach(function (r, i) { if (r[0] !== '') mapa[String(r[0])] = i + 2; });
+  return mapa;
 }
 
 function leerTc_() {
@@ -234,6 +277,32 @@ function leerConfig_() {
 }
 
 function agregar_(m) {
+  const sh = ss_().getSheetByName(HOJA_MOV);
+  escribirMov_(sh, ultimaFila_(sh, [COL.fecha, COL.monto]) + 1, m, true);
+}
+
+/** Edita un movimiento en su misma fila (conserva su hora de registro y su lugar). */
+function editar_(m) {
+  if (!m || !m.id) throw new Error('Falta el movimiento');
+  const sh = ss_().getSheetByName(HOJA_MOV);
+  const fila = filasPorId_(sh, [COL.fecha, COL.monto])[String(m.id)];
+  if (!fila) return agregar_(m);   // si ya no existe, se agrega
+  escribirMov_(sh, fila, m, false);
+}
+
+/** Cambia solo la hora de registro (columna Registrado) para fijar el orden. */
+function reordenar_(items) {
+  if (!items || !items.length) return;
+  const sh = ss_().getSheetByName(HOJA_MOV);
+  const filas = filasPorId_(sh, [COL.fecha, COL.monto]);
+  items.forEach(function (it) {
+    const f = filas[String(it.id)];
+    const d = new Date(it.creado);
+    if (f && !isNaN(d.getTime())) sh.getRange(f, COL.creado).setValue(d);
+  });
+}
+
+function escribirMov_(sh, r, m, nuevo) {
   if (!m) throw new Error('Falta el movimiento');
   const fecha = aFechaTexto_(m.fecha);
   const monto = Number(m.monto);
@@ -243,24 +312,19 @@ function agregar_(m) {
   const moneda = m.moneda === 'USD' ? 'USD' : 'PEN';
   const tc = moneda === 'USD' ? Number(m.tc) : 1;
   if (!(tc > 0)) throw new Error('Tipo de cambio no válido');
-  const sh = ss_().getSheetByName(HOJA_MOV);
-  const r = ultimaFila_(sh, [COL.fecha, COL.monto]) + 1;
   const id = String(m.id || Utilities.getUuid().slice(0, 8));
   // C (Mes) y K (Monto S/) las calculan las fórmulas de la fila 1
   sh.getRange(r, COL.id, 1, 2).setValues([[id, new Date(p[0], p[1] - 1, p[2])]]);
   sh.getRange(r, COL.tipo, 1, 7).setValues([[m.tipo === 'Ingreso' ? 'Ingreso' : 'Gasto', String(m.categoria || ''), String(m.nota || ''), String(m.metodo || ''), moneda, monto, tc]]);
-  sh.getRange(r, COL.creado, 1, 2).setValues([[new Date(), String(m.prestamoId || '')]]);
+  if (nuevo) sh.getRange(r, COL.creado, 1, 2).setValues([[new Date(), String(m.prestamoId || '')]]);
+  else sh.getRange(r, COL.prestamo).setValue(String(m.prestamoId || ''));
 }
 
 function borrar_(id) {
   if (!id) throw new Error('Falta el ID');
   const sh = ss_().getSheetByName(HOJA_MOV);
-  const n = ultimaFila_(sh, [COL.fecha, COL.monto]) - 1;
-  if (n < 1) return;
-  const ids = sh.getRange(2, COL.id, n, 1).getValues();
-  for (let i = ids.length - 1; i >= 0; i--) {
-    if (String(ids[i][0]) === String(id)) { sh.deleteRow(i + 2); return; }
-  }
+  const fila = filasPorId_(sh, [COL.fecha, COL.monto])[String(id)];
+  if (fila) sh.deleteRow(fila);
 }
 
 function guardarConfig_(c) {

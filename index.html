@@ -538,6 +538,7 @@ form{display:flex;flex-direction:column;gap:14px}
   }
 
   function aplicar(data){
+    servidorV2 = Number(data.version)>=2;
     movs = Array.isArray(data.movimientos) ? data.movimientos : [];
     prestamos = Array.isArray(data.prestamos) ? data.prestamos : [];
     if(data.config) cfg = {tc:Number(data.config.tc)||cfg.tc, presupuestos:Object.assign({},data.config.presupuestos||{})};
@@ -558,10 +559,16 @@ form{display:flex;flex-direction:column;gap:14px}
   // ---------- guardado en segundo plano ----------
   // La página se actualiza al instante; los cambios se envían a la hoja en orden, uno tras otro.
   // Al terminar la cola se toma la respuesta de la hoja como la versión real.
-  const cola=[]; let procesando=false, ultimaRespuesta=null, syncTimer=null;
+  const cola=[]; let procesando=false, ultimaRespuesta=null, syncTimer=null, servidorV2=false;
+  // Con el Apps Script v1 (sin lote/editar/reordenar) cada paso se traduce a acciones antiguas.
+  function pasosV1(p){
+    if(p.accion==="editar") return [{accion:"borrar",id:p.mov.id},{accion:"agregar",mov:p.mov}];
+    if(p.accion==="reordenar") return p.movs.flatMap(m=>[{accion:"borrar",id:m.id},{accion:"agregar",mov:m}]);
+    return [p];
+  }
   function pintarSync(){
     const el=$("sync"); clearTimeout(syncTimer);
-    const n=cola.reduce((a,t)=>a+t.pasos.length,0);
+    const n=cola.length;
     if(n){ el.hidden=false; el.className="sync"; el.innerHTML='<span class="dot"></span>Guardando en la hoja'+(n>1?" ("+n+")":"")+"…"; }
   }
   function encolar(desc,pasos){ cola.push({desc,pasos}); pintarSync(); procesar(); }
@@ -577,14 +584,22 @@ form{display:flex;flex-direction:column;gap:14px}
   async function procesar(){
     if(procesando) return; procesando=true;
     while(cola.length){
-      const t=cola[0];
+      // v2: todo lo pendiente viaja en una sola llamada. v1: paso por paso.
+      const tareas = servidorV2 ? cola.slice() : [cola[0]];
+      const t = tareas[tareas.length-1];
+      const desc = tareas.map(x=>x.desc).join(", ");
       try{
-        while(t.pasos.length){ ultimaRespuesta=await enviar(t.pasos[0]); t.pasos.shift(); pintarSync(); }
-        cola.shift();
+        if(servidorV2){
+          ultimaRespuesta = await api("POST",{accion:"lote",pasos:tareas.flatMap(x=>x.pasos)});
+        } else {
+          const pasos=t.pasos.flatMap(pasosV1);
+          for(const p of pasos) ultimaRespuesta=await enviar(p);
+        }
+        cola.splice(0,tareas.length); pintarSync();
       }catch(err){
         cola.length=0; procesando=false;
         const el=$("sync"); el.hidden=false; el.className="sync err"; el.textContent="No se guardó";
-        setStatus(`No se pudo guardar "${t.desc}": ${err.message} Se recargaron los datos reales de tu hoja; revisa y vuelve a intentarlo.`,"err");
+        setStatus(`No se pudo guardar "${desc}": ${err.message} Se recargaron los datos reales de tu hoja; revisa y vuelve a intentarlo.`,"err");
         await cargar(true); return;
       }
     }
@@ -674,7 +689,7 @@ form{display:flex;flex-direction:column;gap:14px}
     const etiqueta = transf ? `Movimiento entre tus cuentas de ${fmtCur(monto,moneda)} (${desde} → ${hacia})` : `${tipo} de ${fmtCur(monto,moneda)}`;
     // Se muestra al instante y se guarda en segundo plano.
     // Editar = borrar la fila original y escribirla de nuevo con el mismo ID (así no hace falta cambiar el Apps Script)
-    if(orig){ movs=movs.map(m=>m.id===orig.id?mov:m); encolar(etiqueta,[{accion:"borrar",id:orig.id},{accion:"agregar",mov}]); }
+    if(orig){ movs=movs.map(m=>m.id===orig.id?mov:m); encolar(etiqueta,[{accion:"editar",mov}]); }
     else { movs=movs.concat([mov]); encolar(etiqueta,[{accion:"agregar",mov}]); }
     if(mov.mes!==$("mes").value) $("mes").value=mov.mes;
     if(fil.modo==="dia" && (orig || mov.fecha!==fil.dia)) fil.dia=mov.fecha;
@@ -723,14 +738,14 @@ form{display:flex;flex-direction:column;gap:14px}
     const reescribir=deseado.slice(0,i+1).reverse();   // de abajo hacia arriba
     if(!reescribir.length){ ordenando=false; renderMovs(); setStatus("El orden no cambió.","info"); return; }
     // El nuevo orden se ve al instante (horas de registro locales); la hoja se actualiza en segundo plano.
-    const base=Date.now(); const pasos=[];
+    const base=Date.now(); const items=[], copias=[];
     reescribir.forEach((m,k)=>{
-      const nuevo=Object.assign({},m,{creado:new Date(base+k*1000).toISOString()});
-      movs=movs.map(x=>x.id===m.id?nuevo:x);
-      pasos.push({accion:"borrar",id:m.id},{accion:"agregar",mov:Object.assign({},m)});
+      const creado=new Date(base+k*1000).toISOString();
+      movs=movs.map(x=>x.id===m.id?Object.assign({},x,{creado}):x);
+      items.push({id:m.id,creado}); copias.push(Object.assign({},m));
     });
     ordenando=false; ultimoMovido=null; renderMovs();
-    encolar("el nuevo orden",pasos);
+    encolar("el nuevo orden",[{accion:"reordenar",items,movs:copias}]);
   });
 
   $("tbody").addEventListener("click", async e=>{
