@@ -315,7 +315,9 @@ a.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
     let data;
     try{ data = await res.json(); }
     catch(e){ throw new Error("La hoja no respondió como se esperaba. Revisa que la aplicación web tenga acceso \"Cualquier usuario\"."); }
-    if(!data.ok) throw new Error(data.error==="Clave incorrecta" ? "La clave no coincide con la del código Apps Script." : (data.error||"Error en la hoja."));
+    if(!data.ok) throw new Error(data.error==="Clave incorrecta" ? "La clave no coincide con la del código Apps Script." :
+      data.error==="Acción desconocida" ? "tu hoja todavía usa el código Apps Script anterior. Pega el Code.gs nuevo y publica una Nueva versión en Implementar → Administrar implementaciones." :
+      (data.error||"Error en la hoja."));
     return data;
   }
 
