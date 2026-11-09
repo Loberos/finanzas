@@ -155,11 +155,15 @@ form{display:flex;flex-direction:column;gap:14px}
 .row3{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .row3 > :first-child{grid-column:1/-1}
 @media (min-width:560px){.row3{grid-template-columns:1fr 1fr 1fr}.row3 > :first-child{grid-column:auto}}
-.seg{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--line);border-radius:var(--radius-s);overflow:hidden;background:var(--surface-2)}
+.seg{display:grid;grid-template-columns:1fr 1fr 1fr;border:1px solid var(--line);border-radius:var(--radius-s);overflow:hidden;background:var(--surface-2)}
 .seg input{position:absolute;opacity:0;width:1px;height:1px}
-.seg label{flex-direction:row;justify-content:center;align-items:center;min-height:44px;font-size:15px;cursor:pointer;color:var(--muted);font-weight:600;margin:0}
+.seg label{flex-direction:row;justify-content:center;align-items:center;text-align:center;line-height:1.15;padding:4px 6px;min-height:44px;font-size:15px;cursor:pointer;color:var(--muted);font-weight:600;margin:0}
 .seg input:checked + label.g{background:var(--bad-bg);color:var(--bad)}
 .seg input:checked + label.i{background:var(--good-bg);color:var(--good)}
+.seg input:checked + label.t{background:var(--accent-soft);color:var(--accent)}
+.tx-ic.tr{background:var(--accent-soft);color:var(--accent);font-size:16px}
+.tx-amt.tr{color:var(--muted)}
+.transf-note{font-size:13px;color:var(--accent);background:var(--accent-soft);border-radius:var(--radius-s);padding:8px 12px}
 .seg input:focus-visible + label{outline:2px solid var(--accent);outline-offset:-2px}
 .check{flex-direction:row;align-items:center;gap:10px;font-size:14px;color:var(--ink);font-weight:500}
 .check input{width:20px;height:20px;min-height:0;margin:0;flex:0 0 auto}
@@ -336,7 +340,9 @@ form{display:flex;flex-direction:column;gap:14px}
           <div class="seg" role="radiogroup" aria-label="Tipo de movimiento">
             <input type="radio" name="tipo" id="tipoG" value="Gasto" checked><label class="g" for="tipoG">Gasto</label>
             <input type="radio" name="tipo" id="tipoI" value="Ingreso"><label class="i" for="tipoI">Ingreso</label>
+            <input type="radio" name="tipo" id="tipoT" value="Transferencia"><label class="t" for="tipoT">Entre mis cuentas</label>
           </div>
+          <p class="transf-note" id="transfNote" hidden>Para pasar plata entre <strong>tus propias cuentas</strong> (por ejemplo, de Prexpe a tu Yape). Queda registrado, pero no suma ni resta en ingresos, gastos ni en tu saldo. Si le transfieres a otra persona, regístralo como <strong>Gasto</strong>.</p>
           <div class="row2">
             <label for="fecha">Fecha<input type="date" id="fecha" required></label>
             <label for="moneda">Moneda
@@ -347,11 +353,16 @@ form{display:flex;flex-direction:column;gap:14px}
             <label for="monto">Monto<input type="number" id="monto" class="num" step="0.01" min="0.01" inputmode="decimal" placeholder="0.00" required></label>
             <label for="tc" id="tcWrap">Tipo de cambio<input type="number" id="tc" class="num" step="0.001" min="0.001" inputmode="decimal"></label>
           </div>
-          <label for="categoria">Categoría<select id="categoria"></select></label>
+          <label for="categoria" id="catWrap">Categoría<select id="categoria"></select></label>
+          <div class="row2" id="transfWrap" hidden>
+            <label for="tDesde">De mi cuenta<input type="text" id="tDesde" list="cuentas" maxlength="40" placeholder="Ej. Prexpe"></label>
+            <label for="tHacia">A mi cuenta<input type="text" id="tHacia" list="cuentas" maxlength="40" placeholder="Ej. Yape"></label>
+          </div>
+          <datalist id="cuentas"><option>Yape</option><option>Plin</option><option>Efectivo</option><option>Prexpe</option><option>BCP</option><option>Interbank</option><option>BBVA</option><option>Scotiabank</option><option>Tarjeta de crédito</option></datalist>
           <label for="prestamoSel" id="prestamoWrap" hidden>¿Es pago de un préstamo?
             <select id="prestamoSel"></select>
           </label>
-          <label for="metodo">Medio de pago
+          <label for="metodo" id="metodoWrap">Medio de pago
             <select id="metodo">
               <option>Efectivo</option><option>Yape / Plin</option><option>Tarjeta de débito</option><option>Tarjeta de crédito</option><option>Transferencia</option><option>Otro</option>
             </select>
@@ -395,7 +406,7 @@ form{display:flex;flex-direction:column;gap:14px}
           </div>
           <button type="button" class="small ftoggle" id="fToggle" aria-expanded="false" aria-controls="moreFilters">Más filtros</button>
           <div class="morefilters" id="moreFilters">
-            <select id="fTipo" aria-label="Tipo"><option value="">Gastos e ingresos</option><option value="Gasto">Solo gastos</option><option value="Ingreso">Solo ingresos</option></select>
+            <select id="fTipo" aria-label="Tipo"><option value="">Todos los tipos</option><option value="Gasto">Solo gastos</option><option value="Ingreso">Solo ingresos</option><option value="Entre mis cuentas">Solo entre mis cuentas</option></select>
             <select id="fCat" aria-label="Categoría"></select>
             <select id="fMetodo" aria-label="Medio de pago"></select>
             <input type="search" id="fQ" class="q" placeholder="Buscar en la descripción…" aria-label="Buscar">
@@ -476,7 +487,11 @@ form{display:flex;flex-direction:column;gap:14px}
   const CAT_GASTO = ["Alimentación","Transporte","Vivienda / Alquiler","Servicios (luz, agua, internet)","Salud","Educación","Entretenimiento","Ropa y cuidado personal","Deudas / Tarjetas","Ahorro e inversión","Otros gastos"];
   const CAT_ING = ["Sueldo","Ventas / Negocio","Freelance","Préstamo recibido","Otros ingresos"];
   const CAT_PRESTAMO = "Préstamo recibido";
-  const CAT_AJUSTE = "Ajuste de saldo";   // no cuenta como ingreso/gasto del mes, solo corrige el saldo disponible
+  const CAT_AJUSTE = "Ajuste de saldo";
+  const CAT_TRANSF = "Transferencia entre mis cuentas"; // no suma ni resta en nada (la hoja lo guarda como Ingreso)
+  const esTransf = x => x.categoria===CAT_TRANSF;
+  const tipoDe = x => esTransf(x) ? "Entre mis cuentas" : x.tipo;
+  const tipoSel = () => document.querySelector('input[name="tipo"]:checked').value;   // no cuenta como ingreso/gasto del mes, solo corrige el saldo disponible
   // El ingreso de un préstamo se liga con "r:<id>" para no confundirlo con los pagos de cuotas (que usan "<id>")
   const refIngreso = id => "r:"+id;
   const KEY_CONN = "finanzas.conexion";
@@ -572,15 +587,16 @@ form{display:flex;flex-direction:column;gap:14px}
   $("tc").value = cfg.tc;
 
   function fillCategorias(){
-    const tipo = document.querySelector('input[name="tipo"]:checked').value;
-    $("categoria").innerHTML = (tipo==="Gasto"?CAT_GASTO:CAT_ING).map(c=>`<option>${esc(c)}</option>`).join("");
+    const tipo = tipoSel();
+    const t = tipo==="Transferencia";
+    $("catWrap").hidden=t; $("metodoWrap").hidden=t; $("transfWrap").hidden=!t; $("transfNote").hidden=!t;
+    if(!t) $("categoria").innerHTML = (tipo==="Gasto"?CAT_GASTO:CAT_ING).map(c=>`<option>${esc(c)}</option>`).join("");
   }
   function toggleTc(){ $("tcWrap").style.visibility = $("moneda").value==="USD" ? "visible" : "hidden"; }
   document.querySelectorAll('input[name="tipo"]').forEach(r=>r.addEventListener("change",()=>{fillCategorias();togglePrestamo();}));
   $("categoria").addEventListener("change",togglePrestamo);
   function togglePrestamo(){
-    const tipo=document.querySelector('input[name="tipo"]:checked').value;
-    $("prestamoWrap").hidden = !(tipo==="Gasto" && $("categoria").value==="Deudas / Tarjetas");
+    $("prestamoWrap").hidden = !(tipoSel()==="Gasto" && $("categoria").value==="Deudas / Tarjetas");
   }
   $("moneda").addEventListener("change",()=>{ $("tc").value = cfg.tc; toggleTc(); });
   fillCategorias(); toggleTc();
@@ -589,7 +605,11 @@ form{display:flex;flex-direction:column;gap:14px}
 
   $("form").addEventListener("submit", async e=>{
     e.preventDefault();
-    const tipo=document.querySelector('input[name="tipo"]:checked').value;
+    const tipoForm=tipoSel(), transf=tipoForm==="Transferencia";
+    const tipo = transf ? "Ingreso" : tipoForm;
+    const desde=$("tDesde").value.trim(), hacia=$("tHacia").value.trim();
+    if(transf && (!desde||!hacia)){ showMsg("Escribe de cuál de tus cuentas sale la plata y a cuál llega.",true); (desde?$("tHacia"):$("tDesde")).focus(); return; }
+    if(transf && desde.toLowerCase()===hacia.toLowerCase()){ showMsg("Las cuentas de origen y destino deben ser distintas.",true); $("tHacia").focus(); return; }
     const fecha=$("fecha").value, moneda=$("moneda").value;
     const monto=round2($("monto").value);
     const tc = moneda==="USD" ? Number($("tc").value) : 1;
@@ -598,9 +618,10 @@ form{display:flex;flex-direction:column;gap:14px}
     if(moneda==="USD" && !(tc>0)){ showMsg("Ingresa el tipo de cambio.",true); $("tc").focus(); return; }
     const orig = editando;
     const mov={id: orig ? orig.id : "m"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),tipo,fecha,mes:fecha.slice(0,7),monto,moneda,tc,
-      montoPEN:round2(monto*tc),categoria:$("categoria").value,metodo:$("metodo").value,nota:$("nota").value.trim(),
+      montoPEN:round2(monto*tc),categoria:transf?CAT_TRANSF:$("categoria").value,metodo:transf?desde+" → "+hacia:$("metodo").value,nota:$("nota").value.trim(),
       creado: orig && orig.creado ? orig.creado : new Date().toISOString(),
-      prestamoId: orig && String(orig.prestamoId||"").startsWith("r:") ? orig.prestamoId : ($("prestamoWrap").hidden ? "" : $("prestamoSel").value)};
+      prestamoId: transf ? "" : orig && String(orig.prestamoId||"").startsWith("r:") ? orig.prestamoId : ($("prestamoWrap").hidden ? "" : $("prestamoSel").value)};
+    const etiqueta = transf ? `Movimiento entre tus cuentas de ${fmtCur(monto,moneda)} (${desde} → ${hacia})` : `${tipo} de ${fmtCur(monto,moneda)}`;
     $("btnSave").disabled=true; showMsg("Guardando en la hoja…");
     try{
       // Editar = borrar la fila original y escribirla de nuevo con el mismo ID (así no hace falta cambiar el Apps Script)
@@ -608,8 +629,8 @@ form{display:flex;flex-direction:column;gap:14px}
       const data = await api("POST",{accion:"agregar",mov});
       if(mov.mes!==$("mes").value) $("mes").value=mov.mes;
       aplicar(data);
-      if(orig){ terminarEdicion(); showMsg("Cambios guardados en la hoja."); if(fil.modo==="dia"){ fil.dia=mov.fecha; renderMovs(); } showTab("movimientos"); setStatus(`Movimiento actualizado: ${tipo} de ${fmtCur(monto,moneda)} del ${fecha.split("-").reverse().join("/")}.`,"ok"); }
-      else { showMsg(`${tipo} de ${fmtCur(monto,moneda)} guardado en la hoja.`); $("monto").value=""; $("nota").value=""; $("prestamoSel").value=""; $("monto").focus(); }
+      if(orig){ terminarEdicion(); showMsg("Cambios guardados en la hoja."); if(fil.modo==="dia"){ fil.dia=mov.fecha; renderMovs(); } showTab("movimientos"); setStatus(`Movimiento actualizado: ${etiqueta} del ${fecha.split("-").reverse().join("/")}.`,"ok"); }
+      else { showMsg(`${etiqueta} guardado en la hoja.`); $("monto").value=""; $("nota").value=""; $("prestamoSel").value=""; $("monto").focus(); }
     }catch(err){ showMsg((orig?"No se guardaron los cambios: ":"No se guardó: ")+err.message+(orig?" Tus datos siguen en el formulario; vuelve a pulsar Guardar.":""),true); }
     finally{ $("btnSave").disabled=false; }
   });
@@ -618,19 +639,21 @@ form{display:flex;flex-direction:column;gap:14px}
   function ensureOption(sel,val){ if(val && ![...sel.options].some(o=>o.value===val)){ const o=document.createElement("option"); o.textContent=val; o.value=val; sel.appendChild(o); } sel.value=val; }
   function empezarEdicion(m){
     editando=m;
-    $(m.tipo==="Ingreso"?"tipoI":"tipoG").checked=true; fillCategorias();
-    ensureOption($("categoria"),m.categoria); togglePrestamo();
+    $(esTransf(m)?"tipoT":m.tipo==="Ingreso"?"tipoI":"tipoG").checked=true; fillCategorias();
+    if(esTransf(m)){ const [a,b]=String(m.metodo||"").split("→").map(t=>t.trim()); $("tDesde").value=a||""; $("tHacia").value=b||""; }
+    else ensureOption($("categoria"),m.categoria);
+    togglePrestamo();
     $("fecha").value=m.fecha; $("moneda").value=m.moneda; toggleTc();
     $("monto").value=Number(m.monto).toFixed(2); $("tc").value=m.moneda==="USD"?m.tc:cfg.tc;
-    ensureOption($("metodo"),m.metodo||"Otro"); $("nota").value=m.nota||"";
+    if(!esTransf(m)) ensureOption($("metodo"),m.metodo||"Otro"); $("nota").value=m.nota||"";
     if(!$("prestamoWrap").hidden) ensureOption($("prestamoSel"),m.prestamoId||"");
     $("fTitle").textContent="Editar movimiento";
-    $("editNote").hidden=false; $("editNote").textContent=`Estás editando: ${m.tipo} de ${fmtCur(m.monto,m.moneda)} del ${m.fecha.split("-").reverse().join("/")} (${m.categoria}).`;
+    $("editNote").hidden=false; $("editNote").textContent=`Estás editando: ${tipoDe(m)} de ${fmtCur(m.monto,m.moneda)} del ${m.fecha.split("-").reverse().join("/")} (${m.categoria}).`;
     $("btnSave").textContent="Guardar cambios"; $("btnCancelEdit").hidden=false; showMsg("");
     showTab("registrar"); window.scrollTo(0,0); $("fecha").focus();
   }
   function terminarEdicion(){
-    editando=null; $("fTitle").textContent="Nuevo movimiento"; $("editNote").hidden=true;
+    editando=null; $("fTitle").textContent="Nuevo movimiento"; $("editNote").hidden=true; $("tDesde").value=""; $("tHacia").value="";
     $("btnSave").textContent="Guardar en la hoja"; $("btnCancelEdit").hidden=true;
     $("fecha").value=today(); $("monto").value=""; $("nota").value=""; $("prestamoSel").value="";
   }
@@ -717,7 +740,7 @@ form{display:flex;flex-direction:column;gap:14px}
     const list = movs.filter(x=>x.mes===$("mes").value && x.categoria!==CAT_AJUSTE);
     renderSaldo();
     let ing=0, gas=0, nI=0, nG=0; const porCat={};
-    list.forEach(x=>{ if(x.tipo==="Ingreso"){ing+=x.montoPEN;nI++;} else {gas+=x.montoPEN;nG++; porCat[x.categoria]=(porCat[x.categoria]||0)+x.montoPEN;} });
+    list.forEach(x=>{ if(esTransf(x)) return; if(x.tipo==="Ingreso"){ing+=x.montoPEN;nI++;} else {gas+=x.montoPEN;nG++; porCat[x.categoria]=(porCat[x.categoria]||0)+x.montoPEN;} });
     $("tIng").textContent=fmtPEN(ing); $("tGas").textContent=fmtPEN(gas);
     const ingPrest = list.filter(x=>x.tipo==="Ingreso"&&x.categoria===CAT_PRESTAMO).reduce((a,x)=>a+x.montoPEN,0);
     $("tIngN").textContent = ingPrest>0 ? "Incluye "+fmtPEN(ingPrest)+" de préstamos" : nI+(nI===1?" movimiento":" movimientos");
@@ -757,7 +780,7 @@ form{display:flex;flex-direction:column;gap:14px}
   // ---------- saldo disponible ----------
   function renderSaldo(){
     const hoy=today();
-    const hasta=movs.filter(x=>x.fecha<=hoy);
+    const hasta=movs.filter(x=>x.fecha<=hoy && !esTransf(x));
     const disp=round2(hasta.reduce((a,x)=>a+(x.tipo==="Ingreso"?x.montoPEN:-x.montoPEN),0));
     const td=$("tDisp"); td.textContent=(disp<0?"−":"")+fmtPEN(Math.abs(disp)); td.className="hero-v"+(disp<0?" neg":"");
     const ajustes=movs.filter(x=>x.categoria===CAT_AJUSTE).sort((a,b)=>(b.fecha+(b.creado||"")).localeCompare(a.fecha+(a.creado||"")));
@@ -806,7 +829,7 @@ form{display:flex;flex-direction:column;gap:14px}
   function filtrados(){
     const [d,h]=rangoActual(), q=sinTildes(fil.q.trim());
     return movs.filter(x=>x.fecha>=d && x.fecha<=h
-      && (!fil.tipo||x.tipo===fil.tipo) && (!fil.cat||x.categoria===fil.cat) && (!fil.metodo||x.metodo===fil.metodo)
+      && (!fil.tipo||tipoDe(x)===fil.tipo) && (!fil.cat||x.categoria===fil.cat) && (!fil.metodo||x.metodo===fil.metodo)
       && (!q||sinTildes(x.nota+" "+x.categoria).includes(q)));
   }
   function llenarSelect(sel,valores,todos,actual){
@@ -839,7 +862,7 @@ form{display:flex;flex-direction:column;gap:14px}
     }
     $("btnOrdenar").hidden = ordenando || fil.modo!=="dia" || rows.length<2;
     $("orderBar").hidden = !ordenando;
-    let ing=0,gas=0; rows.forEach(x=>{ if(x.categoria===CAT_AJUSTE) return; if(x.tipo==="Ingreso") ing+=x.montoPEN; else gas+=x.montoPEN; });
+    let ing=0,gas=0; rows.forEach(x=>{ if(x.categoria===CAT_AJUSTE||esTransf(x)) return; if(x.tipo==="Ingreso") ing+=x.montoPEN; else gas+=x.montoPEN; });
     const [d,h]=rangoActual();
     const titulo = fil.modo==="dia" ? diaLargo(fil.dia) : fil.modo==="semana" ? "Últimos 7 días" : fil.modo==="mes" ? $("chipMes").textContent : (fil.desde||fil.hasta ? (fil.desde?fil.desde.split("-").reverse().join("/"):"…")+" – "+(fil.hasta?fil.hasta.split("-").reverse().join("/"):"…") : "Todas las fechas");
     $("fSum").innerHTML = rows.length
@@ -855,7 +878,7 @@ form{display:flex;flex-direction:column;gap:14px}
     rows.forEach((x,i)=>{
       if(variosDias && x.fecha!==dia){
         dia=x.fecha;
-        const neto=round2(rows.filter(r=>r.fecha===dia).reduce((a,r)=>a+(r.tipo==="Ingreso"?r.montoPEN:-r.montoPEN),0));
+        const neto=round2(rows.filter(r=>r.fecha===dia).reduce((a,r)=>a+(esTransf(r)?0:r.tipo==="Ingreso"?r.montoPEN:-r.montoPEN),0));
         html+=`<li class="txday"><span>${esc(diaLargo(dia))}</span><span class="money ${neto<0?"neg":"pos"}">${neto<0?"−":"+"}${fmtPEN(Math.abs(neto))}</span></li>`;
       }
       html+=txRow(x,true,false, ordenando ? {first:i===0,last:i===rows.length-1,moved:x.id===ultimoMovido} : null);
@@ -894,18 +917,18 @@ form{display:flex;flex-direction:column;gap:14px}
     return t===hoy?"Hoy · "+base : t===ayer?"Ayer · "+base : base;
   }
   function txRow(x, conAcciones, conFecha, orden){
-    const ing=x.tipo==="Ingreso";
+    const ing=x.tipo==="Ingreso", tr=esTransf(x);
     const [y,m,d]=x.fecha.split("-");
     const meta=[conFecha?d+"/"+m:"", x.metodo, x.moneda==="USD"?"TC "+x.tc:""].filter(Boolean).map(esc).join(" · ");
     const conf=pendingDel===x.id;
     return `<li class="tx${conAcciones?" has-acts":""}${orden&&orden.moved?" moving":""}" data-row="${esc(x.id)}">
-      <div class="tx-ic${ing?" in":""}" aria-hidden="true">${esc((x.categoria||"?").charAt(0).toUpperCase())}</div>
+      <div class="tx-ic${tr?" tr":ing?" in":""}" aria-hidden="true">${tr?"⇄":esc((x.categoria||"?").charAt(0).toUpperCase())}</div>
       <div class="tx-main">
-        <div class="tx-title">${esc(x.categoria)}</div>
+        <div class="tx-title">${tr?"Entre mis cuentas":esc(x.categoria)}</div>
         ${x.nota?`<div class="tx-sub" title="${esc(x.nota)}">${esc(x.nota)}</div>`:""}
         <div class="tx-meta">${meta}</div>
       </div>
-      <div class="tx-amt ${ing?"pos":"neg"}">${ing?"+":"−"}${fmtPEN(x.montoPEN)}${x.moneda==="USD"?`<small>${fmtCur(x.monto,"USD")}</small>`:""}</div>
+      <div class="tx-amt ${tr?"tr":ing?"pos":"neg"}">${tr?"":ing?"+":"−"}${fmtPEN(x.montoPEN)}${x.moneda==="USD"?`<small>${fmtCur(x.monto,"USD")}</small>`:""}</div>
       ${orden?`<div class="tx-acts arrows"><button type="button" class="small" data-up="${esc(x.id)}" aria-label="Subir" ${orden.first?"disabled":""}>↑</button><button type="button" class="small" data-down="${esc(x.id)}" aria-label="Bajar" ${orden.last?"disabled":""}>↓</button></div>`:""}
       ${conAcciones&&!orden?`<div class="tx-acts"><button type="button" class="small" data-edit="${esc(x.id)}">Editar</button><button type="button" class="small del${conf?" confirm":""}" data-id="${esc(x.id)}">${conf?"¿Eliminar?":"Borrar"}</button></div>`:""}
     </li>`;
