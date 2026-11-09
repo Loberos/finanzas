@@ -127,6 +127,8 @@ a.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
 .loanactions{display:flex;gap:8px;flex-wrap:wrap}
 .loanactions button{padding:6px 10px;font-size:13px}
 .calc{font-size:13px;color:var(--muted);background:var(--bg);border-radius:8px;padding:8px 10px}
+.editing{margin:-4px 0 12px;font-size:13px;background:var(--warn-bg);color:var(--warn);padding:8px 10px;border-radius:8px}
+.acts{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
 .check{flex-direction:row;align-items:center;gap:8px;font-size:14px;color:var(--ink);font-weight:500}
 .check input{width:18px;height:18px;margin:0}
 .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
@@ -210,6 +212,7 @@ a.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
     <section class="panel" role="tabpanel" id="panel-registrar" aria-labelledby="tab-registrar" hidden>
       <section class="card narrow" aria-labelledby="fTitle">
         <h2 id="fTitle">Nuevo movimiento</h2>
+        <p class="editing" id="editNote" hidden></p>
         <form id="form" novalidate>
           <div class="seg" role="radiogroup" aria-label="Tipo de movimiento">
             <input type="radio" name="tipo" id="tipoG" value="Gasto" checked><label class="g" for="tipoG">Gasto</label>
@@ -235,7 +238,10 @@ a.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
             </select>
           </label>
           <label for="nota">Descripción <span class="hint">(opcional)</span><input type="text" id="nota" maxlength="140" placeholder="Ej. Menú del almuerzo, recibo de luz…"></label>
-          <button class="primary" type="submit" id="btnSave">Guardar en la hoja</button>
+          <div class="foot">
+            <button class="primary" type="submit" id="btnSave" style="flex:1">Guardar en la hoja</button>
+            <button type="button" id="btnCancelEdit" hidden>Cancelar edición</button>
+          </div>
           <div class="msg" id="msg" role="status" aria-live="polite"></div>
         </form>
       </section>
@@ -444,21 +450,49 @@ a.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
     if(!fecha){ showMsg("Elige una fecha.",true); return; }
     if(!(monto>0)){ showMsg("Ingresa un monto mayor que cero.",true); $("monto").focus(); return; }
     if(moneda==="USD" && !(tc>0)){ showMsg("Ingresa el tipo de cambio.",true); $("tc").focus(); return; }
-    const mov={id:"m"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),tipo,fecha,mes:fecha.slice(0,7),monto,moneda,tc,
-      montoPEN:round2(monto*tc),categoria:$("categoria").value,metodo:$("metodo").value,nota:$("nota").value.trim(),creado:new Date().toISOString(),
-      prestamoId: $("prestamoWrap").hidden ? "" : $("prestamoSel").value};
+    const orig = editando;
+    const mov={id: orig ? orig.id : "m"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),tipo,fecha,mes:fecha.slice(0,7),monto,moneda,tc,
+      montoPEN:round2(monto*tc),categoria:$("categoria").value,metodo:$("metodo").value,nota:$("nota").value.trim(),
+      creado: orig && orig.creado ? orig.creado : new Date().toISOString(),
+      prestamoId: orig && String(orig.prestamoId||"").startsWith("r:") ? orig.prestamoId : ($("prestamoWrap").hidden ? "" : $("prestamoSel").value)};
     $("btnSave").disabled=true; showMsg("Guardando en la hoja…");
     try{
+      // Editar = borrar la fila original y escribirla de nuevo con el mismo ID (así no hace falta cambiar el Apps Script)
+      if(orig) await api("POST",{accion:"borrar",id:orig.id});
       const data = await api("POST",{accion:"agregar",mov});
       if(mov.mes!==$("mes").value) $("mes").value=mov.mes;
       aplicar(data);
-      showMsg(`${tipo} de ${fmtCur(monto,moneda)} guardado en la hoja.`);
-      $("monto").value=""; $("nota").value=""; $("prestamoSel").value=""; $("monto").focus();
-    }catch(err){ showMsg("No se guardó: "+err.message,true); }
+      if(orig){ terminarEdicion(); showMsg("Cambios guardados en la hoja."); showTab("movimientos"); setStatus(`Movimiento actualizado: ${tipo} de ${fmtCur(monto,moneda)} del ${fecha.split("-").reverse().join("/")}.`,"ok"); }
+      else { showMsg(`${tipo} de ${fmtCur(monto,moneda)} guardado en la hoja.`); $("monto").value=""; $("nota").value=""; $("prestamoSel").value=""; $("monto").focus(); }
+    }catch(err){ showMsg((orig?"No se guardaron los cambios: ":"No se guardó: ")+err.message+(orig?" Tus datos siguen en el formulario; vuelve a pulsar Guardar.":""),true); }
     finally{ $("btnSave").disabled=false; }
   });
 
+  let editando=null;
+  function ensureOption(sel,val){ if(val && ![...sel.options].some(o=>o.value===val)){ const o=document.createElement("option"); o.textContent=val; o.value=val; sel.appendChild(o); } sel.value=val; }
+  function empezarEdicion(m){
+    editando=m;
+    $(m.tipo==="Ingreso"?"tipoI":"tipoG").checked=true; fillCategorias();
+    ensureOption($("categoria"),m.categoria); togglePrestamo();
+    $("fecha").value=m.fecha; $("moneda").value=m.moneda; toggleTc();
+    $("monto").value=Number(m.monto).toFixed(2); $("tc").value=m.moneda==="USD"?m.tc:cfg.tc;
+    ensureOption($("metodo"),m.metodo||"Otro"); $("nota").value=m.nota||"";
+    if(!$("prestamoWrap").hidden) ensureOption($("prestamoSel"),m.prestamoId||"");
+    $("fTitle").textContent="Editar movimiento";
+    $("editNote").hidden=false; $("editNote").textContent=`Estás editando: ${m.tipo} de ${fmtCur(m.monto,m.moneda)} del ${m.fecha.split("-").reverse().join("/")} (${m.categoria}).`;
+    $("btnSave").textContent="Guardar cambios"; $("btnCancelEdit").hidden=false; showMsg("");
+    showTab("registrar"); window.scrollTo(0,0); $("fecha").focus();
+  }
+  function terminarEdicion(){
+    editando=null; $("fTitle").textContent="Nuevo movimiento"; $("editNote").hidden=true;
+    $("btnSave").textContent="Guardar en la hoja"; $("btnCancelEdit").hidden=true;
+    $("fecha").value=today(); $("monto").value=""; $("nota").value=""; $("prestamoSel").value="";
+  }
+  $("btnCancelEdit").addEventListener("click",()=>{ terminarEdicion(); showMsg(""); showTab("movimientos"); });
+
   $("tbody").addEventListener("click", async e=>{
+    const ed=e.target.closest("[data-edit]");
+    if(ed){ const m=movs.find(x=>x.id===ed.dataset.edit); if(m) empezarEdicion(m); return; }
     const b=e.target.closest(".del"); if(!b) return;
     const id=b.dataset.id;
     if(pendingDel!==id){ pendingDel=id; render(); return; }
@@ -538,7 +572,7 @@ a.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
         <td><strong>${esc(x.categoria)}</strong>${x.nota?"<br>"+esc(x.nota):""}<br><span class="tag">${esc(x.metodo)}${x.moneda==="USD"?" · TC "+esc(x.tc):""}</span></td>
         <td class="r num">${fmtCur(x.monto,x.moneda)}</td>
         <td class="r num ${sign}">${x.tipo==="Ingreso"?"+":"−"}${fmtPEN(x.montoPEN)}</td>
-        <td class="r"><button type="button" class="del${pendingDel===x.id?" confirm":""}" data-id="${esc(x.id)}">${pendingDel===x.id?"¿Eliminar?":"Borrar"}</button></td></tr>`;
+        <td class="r"><div class="acts"><button type="button" class="del" data-edit="${esc(x.id)}">Editar</button><button type="button" class="del${pendingDel===x.id?" confirm":""}" data-id="${esc(x.id)}">${pendingDel===x.id?"¿Eliminar?":"Borrar"}</button></div></td></tr>`;
     }).join("");
   }
 
