@@ -127,6 +127,8 @@ a.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
 .loanactions{display:flex;gap:8px;flex-wrap:wrap}
 .loanactions button{padding:6px 10px;font-size:13px}
 .calc{font-size:13px;color:var(--muted);background:var(--bg);border-radius:8px;padding:8px 10px}
+.check{flex-direction:row;align-items:center;gap:8px;font-size:14px;color:var(--ink);font-weight:500}
+.check input{width:18px;height:18px;margin:0}
 .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
 @media (max-width:420px){.row3{grid-template-columns:1fr 1fr}}
 </style>
@@ -285,6 +287,7 @@ a.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
               <label for="pPrimer">Primer vencimiento<input type="date" id="pPrimer" required></label>
             </div>
             <label for="pNota">Descripción <span class="hint">(opcional)</span><input type="text" id="pNota" maxlength="140" placeholder="Ej. Crédito para la importación"></label>
+            <label class="check" for="pIngreso"><input type="checkbox" id="pIngreso" checked> Registrar lo recibido como ingreso <span class="hint">(categoría "Préstamo recibido")</span></label>
             <div class="calc" id="pCalc">Completa monto, cuotas y cuota para ver cuánto pagarás en total.</div>
             <button class="primary" type="submit" id="btnPrestamo">Guardar préstamo</button>
             <div class="msg" id="pMsg" role="status" aria-live="polite"></div>
@@ -320,7 +323,10 @@ a.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
 (function(){
   "use strict";
   const CAT_GASTO = ["Alimentación","Transporte","Vivienda / Alquiler","Servicios (luz, agua, internet)","Salud","Educación","Entretenimiento","Ropa y cuidado personal","Deudas / Tarjetas","Ahorro e inversión","Otros gastos"];
-  const CAT_ING = ["Sueldo","Ventas / Negocio","Freelance","Otros ingresos"];
+  const CAT_ING = ["Sueldo","Ventas / Negocio","Freelance","Préstamo recibido","Otros ingresos"];
+  const CAT_PRESTAMO = "Préstamo recibido";
+  // El ingreso de un préstamo se liga con "r:<id>" para no confundirlo con los pagos de cuotas (que usan "<id>")
+  const refIngreso = id => "r:"+id;
   const KEY_CONN = "finanzas.conexion";
   const $ = id => document.getElementById(id);
   const fmtPEN = n => "S/ " + (Number(n)||0).toLocaleString("es-PE",{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -488,7 +494,8 @@ a.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
     let ing=0, gas=0, nI=0, nG=0; const porCat={};
     list.forEach(x=>{ if(x.tipo==="Ingreso"){ing+=x.montoPEN;nI++;} else {gas+=x.montoPEN;nG++; porCat[x.categoria]=(porCat[x.categoria]||0)+x.montoPEN;} });
     $("tIng").textContent=fmtPEN(ing); $("tGas").textContent=fmtPEN(gas);
-    $("tIngN").textContent=nI+(nI===1?" movimiento":" movimientos");
+    const ingPrest = list.filter(x=>x.tipo==="Ingreso"&&x.categoria===CAT_PRESTAMO).reduce((a,x)=>a+x.montoPEN,0);
+    $("tIngN").textContent = ingPrest>0 ? "Incluye "+fmtPEN(ingPrest)+" de préstamos" : nI+(nI===1?" movimiento":" movimientos");
     $("tGasN").textContent=nG+(nG===1?" movimiento":" movimientos");
     const bal=ing-gas; const tb=$("tBal"); tb.textContent=fmtPEN(bal); tb.className="v "+(bal<0?"neg":"pos");
     $("tAho").textContent = "Tasa de ahorro: " + (ing>0 ? Math.round(bal/ing*100)+"%" : "—");
@@ -547,7 +554,8 @@ a.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
     return x;
   }
   function estadoPrestamo(p){
-    const pagos=movs.filter(m=>m.prestamoId===p.id);
+    const pagos=movs.filter(m=>m.prestamoId===p.id && m.tipo==="Gasto");
+    const ingreso=movs.find(m=>m.prestamoId===refIngreso(p.id));
     const pagado=round2(pagos.reduce((a,m)=>a+m.montoPEN,0));
     const total=round2(p.cuotas*p.cuota);
     const saldo=Math.max(0,round2(total-pagado));
@@ -555,7 +563,7 @@ a.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
     const prox = saldo>0 && parseD(p.primer) ? addPeriodo(parseD(p.primer),p.frecuencia,nPagadas) : null;
     const hoy=parseD(today());
     const dias = prox ? Math.round((prox-hoy)/DIA) : null;
-    return {pagado,total,saldo,nPagadas,prox,dias,interes:round2(total-p.monto),pagos:pagos.length};
+    return {pagado,total,saldo,nPagadas,prox,dias,interes:round2(total-p.monto),pagos:pagos.length,ingreso};
   }
   function renderPrestamos(){
     const activos=[];
@@ -583,6 +591,7 @@ a.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
         </div>
         <div class="loanactions">
           ${e.saldo>0?`<button type="button" class="primary" data-pagar="${esc(p.id)}">Pagar cuota ${Math.min(e.nPagadas+1,p.cuotas)}</button>`:""}
+          ${!e.ingreso?`<button type="button" data-ingreso="${esc(p.id)}">Registrar los ${fmtPEN(p.monto)} recibidos como ingreso</button>`:""}
           <button type="button" class="del${del?" confirm":""}" data-borrarp="${esc(p.id)}">${del?"¿Eliminar préstamo?":"Eliminar"}</button>
         </div>
       </div>`;
@@ -612,15 +621,35 @@ a.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
       showTab("registrar"); $("monto").focus();
       return;
     }
+    const ib=e.target.closest("[data-ingreso]");
+    if(ib){
+      const p=prestamos.find(x=>x.id===ib.dataset.ingreso); if(!p) return;
+      ib.disabled=true; ib.textContent="Registrando…";
+      try{ aplicar(await api("POST",{accion:"agregar",mov:movIngreso(p)})); setStatus(`Se registró el ingreso de ${fmtPEN(p.monto)} del préstamo ${p.entidad} el ${fmtD(parseD(p.fecha))}.`,"ok"); }
+      catch(err){ setStatus("No se pudo registrar el ingreso: "+err.message,"err"); renderPrestamos(); }
+      return;
+    }
     const db=e.target.closest("[data-borrarp]");
     if(db){
       const id=db.dataset.borrarp;
       if(pendingDel!==id){ pendingDel=id; renderPrestamos(); return; }
       pendingDel=null; db.disabled=true; db.textContent="Eliminando…";
-      try{ aplicar(await api("POST",{accion:"prestamo_borrar",id})); setStatus("Préstamo eliminado. Los pagos que hiciste siguen en Movimientos como gastos.","ok"); }
+      try{
+        const ing=movs.find(m=>m.prestamoId===refIngreso(id));
+        if(ing) await api("POST",{accion:"borrar",id:ing.id});
+        aplicar(await api("POST",{accion:"prestamo_borrar",id}));
+        setStatus("Préstamo eliminado"+(ing?", junto con su ingreso":"")+". Los pagos de cuotas que hiciste siguen en Movimientos como gastos.","ok");
+      }
       catch(err){ setStatus("No se pudo eliminar: "+err.message,"err"); renderPrestamos(); }
     }
   });
+
+  function movIngreso(p){
+    return {id:"m"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),tipo:"Ingreso",fecha:p.fecha,mes:p.fecha.slice(0,7),
+      monto:p.monto,moneda:"PEN",tc:1,montoPEN:p.monto,categoria:CAT_PRESTAMO,
+      metodo:p.entidad.toLowerCase()==="yape"?"Yape / Plin":"Transferencia",
+      nota:"Préstamo "+p.entidad+(p.nota?" · "+p.nota:""),creado:new Date().toISOString(),prestamoId:refIngreso(p.id)};
+  }
 
   function calcPrestamo(){
     const m=Number($("pMonto").value), n=Math.round(Number($("pCuotas").value)), c=Number($("pCuota").value);
@@ -656,7 +685,7 @@ a.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
   $("formPrestamo").addEventListener("submit", async e=>{
     e.preventDefault();
     const pm=$("pMsg"); const err=t=>{ pm.textContent=t; pm.className="msg err"; };
-    const prestamo={entidad:$("pEntidad").value.trim(),fecha:$("pFecha").value,monto:round2($("pMonto").value),
+    const prestamo={id:"p"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),entidad:$("pEntidad").value.trim(),fecha:$("pFecha").value,monto:round2($("pMonto").value),
       cuotas:Math.round(Number($("pCuotas").value)),cuota:round2($("pCuota").value),frecuencia:$("pFrec").value,primer:$("pPrimer").value,nota:$("pNota").value.trim()};
     if(!prestamo.entidad) return err("Escribe la entidad (Yape, Prexpe…).");
     if(!prestamo.fecha) return err("Elige la fecha en que recibiste el dinero.");
@@ -666,8 +695,11 @@ a.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
     if(!prestamo.primer) return err("Elige la fecha del primer vencimiento.");
     $("btnPrestamo").disabled=true; pm.textContent="Guardando en la hoja…"; pm.className="msg";
     try{
-      aplicar(await api("POST",{accion:"prestamo_agregar",prestamo}));
-      pm.textContent=`Préstamo de ${prestamo.entidad} guardado.`;
+      let data=await api("POST",{accion:"prestamo_agregar",prestamo});
+      const conIngreso=$("pIngreso").checked;
+      if(conIngreso) data=await api("POST",{accion:"agregar",mov:movIngreso(prestamo)});
+      aplicar(data);
+      pm.textContent=`Préstamo de ${prestamo.entidad} guardado`+(conIngreso?` y ${fmtPEN(prestamo.monto)} registrados como ingreso.`:".");
       ["pEntidad","pMonto","pCuotas","pCuota","pPrimer","pNota"].forEach(id=>$(id).value=""); calcPrestamo();
     }catch(e2){ err("No se guardó: "+e2.message); }
     finally{ $("btnPrestamo").disabled=false; }
