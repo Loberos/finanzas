@@ -187,6 +187,40 @@ form{display:flex;flex-direction:column;gap:14px}
 #conexion{max-width:560px}
 #conexion ol{margin:0 0 14px;padding-left:20px;color:var(--muted);font-size:14px}
 
+/* ---------- saldo disponible ---------- */
+.hero{display:flex;flex-direction:column;gap:12px;background:linear-gradient(135deg,#1f47c4,#2f63e6);color:#fff;border:none}
+.hero .k{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;opacity:.85}
+.hero-v{font-family:var(--f-num);font-variant-numeric:tabular-nums;font-weight:600;font-size:clamp(28px,8vw,38px);line-height:1.15;white-space:nowrap}
+.hero-v.neg{color:#ffd2cc}
+.hero .h{font-size:13px;opacity:.9}
+.hero-side{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;font-size:13px}
+.hero-side b{font-family:var(--f-num);white-space:nowrap}
+.hero button{background:rgba(255,255,255,.15);color:#fff;border-color:rgba(255,255,255,.35)}
+.hero button:hover{background:rgba(255,255,255,.25);border-color:#fff}
+.hero form{background:#fff;color:var(--ink);border-radius:var(--radius-s);padding:12px;gap:10px}
+.hero form button{background:var(--surface);color:var(--ink);border-color:var(--line)}
+.hero form button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+@media (min-width:720px){.hero{flex-direction:row;align-items:center;justify-content:space-between;padding:22px 24px}.hero-side{flex-direction:column;align-items:flex-end;text-align:right}.hero form{min-width:320px}}
+
+/* ---------- filtros ---------- */
+.filters{display:flex;flex-direction:column;gap:10px;margin-bottom:12px}
+.chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+.chips::-webkit-scrollbar{display:none}
+.chip{min-height:36px;padding:6px 14px;border-radius:999px;font-size:13px;background:var(--surface-2);flex:0 0 auto}
+.chip[aria-pressed="true"]{background:var(--accent);color:#fff;border-color:var(--accent)}
+.daynav{display:grid;grid-template-columns:44px 1fr 44px;gap:6px;align-items:center}
+.daynav button{padding:0;font-size:20px;line-height:1}
+.daynav .dlabel{text-align:center;font-weight:600;font-size:14px}
+.daynav input{text-align:center}
+.range{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.morefilters{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.morefilters .q{grid-column:1/-1}
+.ftoggle{align-self:flex-start}
+@media (max-width:719px){.morefilters:not(.open){display:none}}
+@media (min-width:720px){.ftoggle{display:none!important}.morefilters{grid-template-columns:190px 1fr 1fr 1.4fr}.morefilters .q{grid-column:auto}.daynav{max-width:360px}.range{max-width:420px}}
+.fsum{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;color:var(--muted);background:var(--surface-2);border:1px solid var(--line);border-radius:var(--radius-s);padding:8px 12px;margin-bottom:6px}
+.fsum b{font-family:var(--f-num);white-space:nowrap}
+
 @media (prefers-reduced-motion:no-preference){.bar i{transition:width .3s ease}}
 </style>
 </head>
@@ -247,6 +281,25 @@ form{display:flex;flex-direction:column;gap:14px}
 
     <!-- RESUMEN -->
     <section class="panel" role="tabpanel" id="panel-resumen" aria-labelledby="tab-resumen">
+      <section class="card hero" aria-labelledby="dispTitle">
+        <div>
+          <div class="k" id="dispTitle">Te queda en la cuenta</div>
+          <div class="hero-v" id="tDisp">S/ 0.00</div>
+          <div class="h" id="tDispH">Según tus movimientos hasta hoy</div>
+        </div>
+        <div class="hero-side" id="heroSide">
+          <span id="tDispNeto"></span>
+          <button type="button" class="small" id="btnAjustar">Ajustar saldo</button>
+        </div>
+        <form id="formAjuste" novalidate hidden>
+          <label for="ajReal">¿Cuánto tienes de verdad hoy en tu cuenta? (S/)
+            <input type="number" id="ajReal" class="num" step="0.01" inputmode="decimal" placeholder="0.00">
+          </label>
+          <span class="hint">Suma tu saldo de Yape, banco y efectivo. Se registra la diferencia como "Ajuste de saldo"; no cuenta como ingreso ni gasto del mes.</span>
+          <div class="foot"><button type="submit" class="primary small" id="btnAjGuardar">Guardar saldo</button><button type="button" class="small" id="btnAjCancelar">Cancelar</button></div>
+          <div class="msg" id="ajMsg" role="status" aria-live="polite"></div>
+        </form>
+      </section>
       <div class="tiles" aria-label="Resumen del mes">
         <div class="tile"><div class="k">Ingresos</div><div class="v pos" id="tIng">S/ 0.00</div><div class="h" id="tIngN">0 movimientos</div></div>
         <div class="tile"><div class="k">Gastos</div><div class="v neg" id="tGas">S/ 0.00</div><div class="h" id="tGasN">0 movimientos</div></div>
@@ -260,7 +313,7 @@ form{display:flex;flex-direction:column;gap:14px}
           <div class="budget" id="budget"></div>
         </section>
         <section class="card" aria-labelledby="rUltTitle">
-          <div class="cardhead"><h2 id="rUltTitle">Últimos movimientos</h2><button type="button" class="linkbtn" data-goto="movimientos">Ver todos</button></div>
+          <div class="cardhead"><h2 id="rUltTitle">Últimos movimientos</h2><button type="button" class="linkbtn" data-goto="movimientos" id="verTodos">Ver todos</button></div>
           <ul class="txlist" id="recent"></ul>
           <button type="button" class="primary" data-goto="registrar" style="margin-top:14px;width:100%">Registrar movimiento</button>
         </section>
@@ -310,13 +363,37 @@ form{display:flex;flex-direction:column;gap:14px}
     <section class="panel" role="tabpanel" id="panel-movimientos" aria-labelledby="tab-movimientos" hidden>
       <section class="card" aria-labelledby="mTitle">
         <div class="cardhead">
-          <h2 id="mTitle">Movimientos del mes</h2>
-          <select id="filtro" aria-label="Filtrar movimientos" style="width:auto;min-width:150px">
-            <option value="">Todos</option><option value="Gasto">Solo gastos</option><option value="Ingreso">Solo ingresos</option>
-          </select>
+          <h2 id="mTitle">Movimientos</h2>
+          <button type="button" class="linkbtn" id="fLimpiar" hidden>Quitar filtros</button>
         </div>
+        <div class="filters">
+          <div class="chips" role="group" aria-label="Periodo">
+            <button type="button" class="chip" data-periodo="hoy">Hoy</button>
+            <button type="button" class="chip" data-periodo="ayer">Ayer</button>
+            <button type="button" class="chip" data-periodo="semana">Últimos 7 días</button>
+            <button type="button" class="chip" data-periodo="mes" id="chipMes">Este mes</button>
+            <button type="button" class="chip" data-periodo="rango">Rango de fechas</button>
+          </div>
+          <div class="daynav" id="dayNav">
+            <button type="button" id="dPrev" aria-label="Día anterior">‹</button>
+            <input type="date" id="fDia" aria-label="Día">
+            <button type="button" id="dNext" aria-label="Día siguiente">›</button>
+          </div>
+          <div class="range" id="rangeBox" hidden>
+            <label for="fDesde">Desde<input type="date" id="fDesde"></label>
+            <label for="fHasta">Hasta<input type="date" id="fHasta"></label>
+          </div>
+          <button type="button" class="small ftoggle" id="fToggle" aria-expanded="false" aria-controls="moreFilters">Más filtros</button>
+          <div class="morefilters" id="moreFilters">
+            <select id="fTipo" aria-label="Tipo"><option value="">Gastos e ingresos</option><option value="Gasto">Solo gastos</option><option value="Ingreso">Solo ingresos</option></select>
+            <select id="fCat" aria-label="Categoría"></select>
+            <select id="fMetodo" aria-label="Medio de pago"></select>
+            <input type="search" id="fQ" class="q" placeholder="Buscar en la descripción…" aria-label="Buscar">
+          </div>
+        </div>
+        <div class="fsum" id="fSum"></div>
         <ul class="txlist" id="tbody"></ul>
-        <div class="empty" id="empty">Aún no hay movimientos este mes. Regístralos en la pestaña Registrar.</div>
+        <div class="empty" id="empty"></div>
       </section>
     </section>
 
@@ -385,6 +462,7 @@ form{display:flex;flex-direction:column;gap:14px}
   const CAT_GASTO = ["Alimentación","Transporte","Vivienda / Alquiler","Servicios (luz, agua, internet)","Salud","Educación","Entretenimiento","Ropa y cuidado personal","Deudas / Tarjetas","Ahorro e inversión","Otros gastos"];
   const CAT_ING = ["Sueldo","Ventas / Negocio","Freelance","Préstamo recibido","Otros ingresos"];
   const CAT_PRESTAMO = "Préstamo recibido";
+  const CAT_AJUSTE = "Ajuste de saldo";   // no cuenta como ingreso/gasto del mes, solo corrige el saldo disponible
   // El ingreso de un préstamo se liga con "r:<id>" para no confundirlo con los pagos de cuotas (que usan "<id>")
   const refIngreso = id => "r:"+id;
   const KEY_CONN = "finanzas.conexion";
@@ -516,7 +594,7 @@ form{display:flex;flex-direction:column;gap:14px}
       const data = await api("POST",{accion:"agregar",mov});
       if(mov.mes!==$("mes").value) $("mes").value=mov.mes;
       aplicar(data);
-      if(orig){ terminarEdicion(); showMsg("Cambios guardados en la hoja."); showTab("movimientos"); setStatus(`Movimiento actualizado: ${tipo} de ${fmtCur(monto,moneda)} del ${fecha.split("-").reverse().join("/")}.`,"ok"); }
+      if(orig){ terminarEdicion(); showMsg("Cambios guardados en la hoja."); if(fil.modo==="dia"){ fil.dia=mov.fecha; renderMovs(); } showTab("movimientos"); setStatus(`Movimiento actualizado: ${tipo} de ${fmtCur(monto,moneda)} del ${fecha.split("-").reverse().join("/")}.`,"ok"); }
       else { showMsg(`${tipo} de ${fmtCur(monto,moneda)} guardado en la hoja.`); $("monto").value=""; $("nota").value=""; $("prestamoSel").value=""; $("monto").focus(); }
     }catch(err){ showMsg((orig?"No se guardaron los cambios: ":"No se guardó: ")+err.message+(orig?" Tus datos siguen en el formulario; vuelve a pulsar Guardar.":""),true); }
     finally{ $("btnSave").disabled=false; }
@@ -573,12 +651,13 @@ form{display:flex;flex-direction:column;gap:14px}
   });
 
   $("mes").addEventListener("change",()=>{pendingDel=null;render();});
-  $("filtro").addEventListener("change",render);
+
 
   // ---------- render ----------
   function render(){
     renderPrestamos();
-    const list = movs.filter(x=>x.mes===$("mes").value);
+    const list = movs.filter(x=>x.mes===$("mes").value && x.categoria!==CAT_AJUSTE);
+    renderSaldo();
     let ing=0, gas=0, nI=0, nG=0; const porCat={};
     list.forEach(x=>{ if(x.tipo==="Ingreso"){ing+=x.montoPEN;nI++;} else {gas+=x.montoPEN;nG++; porCat[x.categoria]=(porCat[x.categoria]||0)+x.montoPEN;} });
     $("tIng").textContent=fmtPEN(ing); $("tGas").textContent=fmtPEN(gas);
@@ -614,21 +693,133 @@ form{display:flex;flex-direction:column;gap:14px}
     const recientes = list.slice().sort(orden).slice(0,6);
     $("recent").innerHTML = recientes.length ? recientes.map(x=>txRow(x,false,true)).join("") : '<li class="empty">Aún no hay movimientos este mes.</li>';
 
-    const f=$("filtro").value;
-    const rows = list.filter(x=>!f||x.tipo===f).sort(orden);
+    renderMovs();
+  }
+
+  // ---------- saldo disponible ----------
+  function renderSaldo(){
+    const hoy=today();
+    const hasta=movs.filter(x=>x.fecha<=hoy);
+    const disp=round2(hasta.reduce((a,x)=>a+(x.tipo==="Ingreso"?x.montoPEN:-x.montoPEN),0));
+    const td=$("tDisp"); td.textContent=(disp<0?"−":"")+fmtPEN(Math.abs(disp)); td.className="hero-v"+(disp<0?" neg":"");
+    const ajustes=movs.filter(x=>x.categoria===CAT_AJUSTE).sort((a,b)=>(b.fecha+(b.creado||"")).localeCompare(a.fecha+(a.creado||"")));
+    const futuros=movs.filter(x=>x.fecha>hoy).length;
+    $("tDispH").textContent = ajustes.length
+      ? "Último ajuste el "+ajustes[0].fecha.split("-").reverse().join("/")+(futuros?" · no incluye "+futuros+" movimiento(s) con fecha futura":"")
+      : (movs.length ? "¿No cuadra con tu cuenta? Pulsa Ajustar saldo y pon tu saldo real." : "Registra tus movimientos o pon tu saldo actual con Ajustar saldo.");
+    const deuda=prestamos.reduce((a,p)=>a+estadoPrestamo(p).saldo,0);
+    $("tDispNeto").innerHTML = deuda>0 ? `Después de pagar tus préstamos: <b>${disp-deuda<0?"−":""}${fmtPEN(Math.abs(round2(disp-deuda)))}</b>` : "";
+    return disp;
+  }
+  $("btnAjustar").addEventListener("click",()=>{
+    $("formAjuste").hidden=false; $("heroSide").hidden=true; $("ajMsg").textContent="";
+    $("ajReal").value=""; $("ajReal").focus();
+  });
+  $("btnAjCancelar").addEventListener("click",()=>{ $("formAjuste").hidden=true; $("heroSide").hidden=false; });
+  $("formAjuste").addEventListener("submit", async e=>{
+    e.preventDefault();
+    const am=$("ajMsg"); const real=round2($("ajReal").value);
+    if($("ajReal").value.trim()===""||isNaN(real)){ am.textContent="Escribe cuánto tienes hoy."; am.className="msg err"; return; }
+    const disp=renderSaldo(); const dif=round2(real-disp);
+    if(Math.abs(dif)<0.01){ am.textContent="Tu saldo ya cuadra. No hace falta ajustar."; am.className="msg"; return; }
+    const mov={id:"m"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),tipo:dif>0?"Ingreso":"Gasto",fecha:today(),mes:today().slice(0,7),
+      monto:Math.abs(dif),moneda:"PEN",tc:1,montoPEN:Math.abs(dif),categoria:CAT_AJUSTE,metodo:"Otro",
+      nota:"Saldo real informado: "+fmtPEN(real),creado:new Date().toISOString(),prestamoId:""};
+    $("btnAjGuardar").disabled=true; am.textContent="Guardando…"; am.className="msg";
+    try{
+      aplicar(await api("POST",{accion:"agregar",mov}));
+      $("formAjuste").hidden=true; $("heroSide").hidden=false;
+      setStatus(`Saldo ajustado a ${fmtPEN(real)} (diferencia de ${dif>0?"+":"−"}${fmtPEN(Math.abs(dif))}).`,"ok");
+    }catch(err){ am.textContent="No se guardó: "+err.message; am.className="msg err"; }
+    finally{ $("btnAjGuardar").disabled=false; }
+  });
+
+  // ---------- filtros de movimientos ----------
+  const fil={modo:"dia",dia:today(),desde:"",hasta:"",tipo:"",cat:"",metodo:"",q:""};
+  function isoMasDias(t,n){ const [y,m,d]=t.split("-").map(Number); const x=new Date(y,m-1,d+n); return x.getFullYear()+"-"+pad(x.getMonth()+1)+"-"+pad(x.getDate()); }
+  const MES_LARGO=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+  function rangoActual(){
+    if(fil.modo==="dia") return [fil.dia,fil.dia];
+    if(fil.modo==="semana") return [isoMasDias(today(),-6),today()];
+    if(fil.modo==="mes"){ const m=$("mes").value; const [y,mm]=m.split("-").map(Number); return [m+"-01", m+"-"+pad(new Date(y,mm,0).getDate())]; }
+    let d=fil.desde||"0000-01-01", h=fil.hasta||"9999-12-31"; if(d>h) [d,h]=[h,d]; return [d,h];
+  }
+  function sinTildes(t){ return String(t||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase(); }
+  function filtrados(){
+    const [d,h]=rangoActual(), q=sinTildes(fil.q.trim());
+    return movs.filter(x=>x.fecha>=d && x.fecha<=h
+      && (!fil.tipo||x.tipo===fil.tipo) && (!fil.cat||x.categoria===fil.cat) && (!fil.metodo||x.metodo===fil.metodo)
+      && (!q||sinTildes(x.nota+" "+x.categoria).includes(q)));
+  }
+  function llenarSelect(sel,valores,todos,actual){
+    const opts=[`<option value="">${todos}</option>`].concat(valores.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`));
+    sel.innerHTML=opts.join(""); sel.value=valores.includes(actual)?actual:"";
+  }
+  function renderMovs(){
+    // opciones según los datos
+    const cats=[...new Set(CAT_GASTO.concat(CAT_ING).concat(movs.map(x=>x.categoria)).filter(Boolean))];
+    llenarSelect($("fCat"),cats,"Todas las categorías",fil.cat);
+    const mets=[...new Set(["Efectivo","Yape / Plin","Tarjeta de débito","Tarjeta de crédito","Transferencia","Otro"].concat(movs.map(x=>x.metodo)).filter(Boolean))];
+    llenarSelect($("fMetodo"),mets,"Todos los medios de pago",fil.metodo);
+    $("fTipo").value=fil.tipo; if(document.activeElement!==$("fQ")) $("fQ").value=fil.q;
+    // periodo
+    const hoy=today(), ayer=isoMasDias(hoy,-1);
+    const activo = fil.modo==="dia" ? (fil.dia===hoy?"hoy":fil.dia===ayer?"ayer":"") : fil.modo;
+    document.querySelectorAll("[data-periodo]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.periodo===activo?"true":"false"));
+    const [my,mm]=$("mes").value.split("-").map(Number); $("chipMes").textContent= mm? MES_LARGO[mm-1].charAt(0).toUpperCase()+MES_LARGO[mm-1].slice(1)+(my!==new Date().getFullYear()?" "+my:"") : "Este mes";
+    $("dayNav").hidden = fil.modo!=="dia"; $("fDia").value=fil.dia; $("dNext").disabled = false;
+    $("rangeBox").hidden = fil.modo!=="rango"; $("fDesde").value=fil.desde; $("fHasta").value=fil.hasta;
+    const extra=[fil.tipo,fil.cat,fil.metodo,fil.q.trim()].filter(Boolean).length;
+    $("fToggle").textContent = extra ? "Más filtros ("+extra+")" : "Más filtros";
+    $("fLimpiar").hidden = !(extra || !(fil.modo==="dia"&&fil.dia===hoy));
+    // datos
+    const orden=(a,b)=>(b.fecha+(b.creado||"")).localeCompare(a.fecha+(a.creado||""));
+    const rows=filtrados().sort(orden);
+    let ing=0,gas=0; rows.forEach(x=>{ if(x.categoria===CAT_AJUSTE) return; if(x.tipo==="Ingreso") ing+=x.montoPEN; else gas+=x.montoPEN; });
+    const [d,h]=rangoActual();
+    const titulo = fil.modo==="dia" ? diaLargo(fil.dia) : fil.modo==="semana" ? "Últimos 7 días" : fil.modo==="mes" ? $("chipMes").textContent : (fil.desde||fil.hasta ? (fil.desde?fil.desde.split("-").reverse().join("/"):"…")+" – "+(fil.hasta?fil.hasta.split("-").reverse().join("/"):"…") : "Todas las fechas");
+    $("fSum").innerHTML = rows.length
+      ? `<span>${esc(titulo)} · ${rows.length} ${rows.length===1?"movimiento":"movimientos"}</span><span>Ingresos <b class="pos">+${fmtPEN(ing)}</b></span><span>Gastos <b class="neg">−${fmtPEN(gas)}</b></span><span>Neto <b class="${ing-gas<0?"neg":"pos"}">${ing-gas<0?"−":"+"}${fmtPEN(Math.abs(round2(ing-gas)))}</b></span>`
+      : `<span>${esc(titulo)}</span>`;
+    $("fSum").hidden=false;
+    const vacio = extra ? "No hay movimientos con estos filtros." :
+      fil.modo==="dia" ? (fil.dia===hoy?"Hoy aún no registraste movimientos.":fil.dia===ayer?"Ayer no registraste movimientos.":"No hay movimientos ese día.") : "No hay movimientos en este periodo.";
+    $("empty").innerHTML = rows.length ? "" : esc(vacio)+(fil.modo==="dia"&&fil.dia===hoy&&!extra?' <button type="button" class="linkbtn" data-goto="registrar">Registrar uno</button>':"");
     $("empty").style.display = rows.length?"none":"block";
     let html="", dia="";
+    const variosDias = fil.modo!=="dia";
     rows.forEach(x=>{
-      if(x.fecha!==dia){
+      if(variosDias && x.fecha!==dia){
         dia=x.fecha;
-        const delDia=rows.filter(r=>r.fecha===dia);
-        const neto=round2(delDia.reduce((a,r)=>a+(r.tipo==="Ingreso"?r.montoPEN:-r.montoPEN),0));
+        const neto=round2(rows.filter(r=>r.fecha===dia).reduce((a,r)=>a+(r.tipo==="Ingreso"?r.montoPEN:-r.montoPEN),0));
         html+=`<li class="txday"><span>${esc(diaLargo(dia))}</span><span class="money ${neto<0?"neg":"pos"}">${neto<0?"−":"+"}${fmtPEN(Math.abs(neto))}</span></li>`;
       }
       html+=txRow(x,true,false);
     });
     $("tbody").innerHTML = html;
   }
+  document.querySelector(".chips").addEventListener("click",e=>{
+    const b=e.target.closest("[data-periodo]"); if(!b) return;
+    const p=b.dataset.periodo, hoy=today();
+    if(p==="hoy"){ fil.modo="dia"; fil.dia=hoy; }
+    else if(p==="ayer"){ fil.modo="dia"; fil.dia=isoMasDias(hoy,-1); }
+    else if(p==="rango"){ fil.modo="rango"; if(!fil.desde&&!fil.hasta){ fil.desde=isoMasDias(hoy,-30); fil.hasta=hoy; } }
+    else fil.modo=p;
+    pendingDel=null; renderMovs();
+  });
+  $("dPrev").addEventListener("click",()=>{ fil.dia=isoMasDias(fil.dia,-1); renderMovs(); });
+  $("dNext").addEventListener("click",()=>{ fil.dia=isoMasDias(fil.dia,1); renderMovs(); });
+  $("fDia").addEventListener("change",()=>{ if($("fDia").value){ fil.dia=$("fDia").value; renderMovs(); } });
+  $("fDesde").addEventListener("change",()=>{ fil.desde=$("fDesde").value; renderMovs(); });
+  $("fHasta").addEventListener("change",()=>{ fil.hasta=$("fHasta").value; renderMovs(); });
+  $("fTipo").addEventListener("change",()=>{ fil.tipo=$("fTipo").value; renderMovs(); });
+  $("fCat").addEventListener("change",()=>{ fil.cat=$("fCat").value; renderMovs(); });
+  $("fMetodo").addEventListener("change",()=>{ fil.metodo=$("fMetodo").value; renderMovs(); });
+  let qTimer=null;
+  $("fQ").addEventListener("input",()=>{ clearTimeout(qTimer); qTimer=setTimeout(()=>{ fil.q=$("fQ").value; renderMovs(); },200); });
+  $("verTodos").addEventListener("click",()=>{ fil.modo="mes"; renderMovs(); });
+  $("fToggle").addEventListener("click",()=>{ const o=$("moreFilters").classList.toggle("open"); $("fToggle").setAttribute("aria-expanded",o?"true":"false"); });
+  $("fLimpiar").addEventListener("click",()=>{ Object.assign(fil,{modo:"dia",dia:today(),desde:"",hasta:"",tipo:"",cat:"",metodo:"",q:""}); $("fQ").value=""; renderMovs(); });
 
   const DIAS=["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
   const MESES=["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
