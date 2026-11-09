@@ -588,6 +588,28 @@ a.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
   ["pMonto","pCuotas","pCuota"].forEach(id=>$(id).addEventListener("input",calcPrestamo));
   $("pFecha").value=today();
 
+  // Créditos Yape: siempre 1 cuota a 30 días. Se autocompleta, pero se puede cambiar.
+  const auto={cuotas:false,primer:false};
+  function isoMas(t,dias){ const d=parseD(t); if(!d) return ""; d.setDate(d.getDate()+dias); return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate()); }
+  function autoYape(){
+    const esYape=$("pEntidad").value.trim().toLowerCase()==="yape";
+    if(esYape){
+      if(!$("pCuotas").value||auto.cuotas){ $("pCuotas").value="1"; auto.cuotas=true; }
+      if(!$("pPrimer").value||auto.primer){ $("pPrimer").value=isoMas($("pFecha").value,30); auto.primer=true; }
+      $("pMsg").textContent="Crédito Yape: 1 cuota a 30 días. Solo pon el monto de la cuota (lo que te cobrarán)."; $("pMsg").className="msg";
+      calcPrestamo();
+    } else {
+      if(auto.cuotas){ $("pCuotas").value=""; auto.cuotas=false; }
+      if(auto.primer){ $("pPrimer").value=""; auto.primer=false; }
+      if($("pMsg").textContent.startsWith("Crédito Yape")) $("pMsg").textContent="";
+      calcPrestamo();
+    }
+  }
+  $("pEntidad").addEventListener("input",autoYape);
+  $("pFecha").addEventListener("change",autoYape);
+  $("pCuotas").addEventListener("input",()=>{auto.cuotas=false;});
+  $("pPrimer").addEventListener("change",()=>{auto.primer=false;});
+
   $("formPrestamo").addEventListener("submit", async e=>{
     e.preventDefault();
     const pm=$("pMsg"); const err=t=>{ pm.textContent=t; pm.className="msg err"; };
