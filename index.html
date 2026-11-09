@@ -9,150 +9,209 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-/* Layout: tema claro; pestañas Resumen · Registrar · Movimientos · Préstamos · Presupuesto */
+/* Mis Finanzas — tema claro, mobile-first. Pestañas: Resumen · Registrar · Movimientos · Préstamos · Presupuesto */
 :root{
-  --bg:#f3f5f8; --surface:#ffffff; --ink:#16233f; --muted:#5d6a82; --line:#dde2ea;
-  --accent:#1f4fd1; --accent-ink:#ffffff;
-  --good:#11845b; --warn:#b86e00; --bad:#c2352b;
-  --good-bg:#e5f4ee; --warn-bg:#fdf1de; --bad-bg:#fbe7e5;
+  --bg:#f2f4f8; --surface:#ffffff; --surface-2:#f7f8fb; --ink:#14213d; --muted:#5f6b84; --line:#e1e5ee;
+  --accent:#2350d8; --accent-ink:#ffffff; --accent-soft:#e8eefc;
+  --good:#0f7f56; --warn:#a86400; --bad:#c0352a;
+  --good-bg:#e4f4ec; --warn-bg:#fdf0dc; --bad-bg:#fbe8e6;
+  --radius:14px; --radius-s:10px;
+  --shadow:0 1px 2px rgba(20,33,61,.05),0 4px 14px rgba(20,33,61,.04);
   --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
   --f-num:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
   color-scheme:light;
 }
 *{box-sizing:border-box}
 html,body{margin:0}
-body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45}
-.wrap{max-width:1180px;margin:0 auto;padding:20px 16px 48px;display:flex;flex-direction:column;gap:18px}
-header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
-h1{font-size:24px;margin:0;text-wrap:balance}
-h2{font-size:16px;margin:0 0 12px}
-.sub{color:var(--muted);font-size:13px;margin:2px 0 0}
-.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
-label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:var(--muted)}
-input,select,textarea{font:inherit;font-size:15px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 10px;min-width:0;width:100%}
-input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45;-webkit-text-size-adjust:100%}
+[hidden]{display:none!important}
+.wrap{max-width:1180px;margin:0 auto;padding:16px 14px 56px;display:flex;flex-direction:column;gap:16px}
+@media (min-width:720px){.wrap{padding:24px 24px 64px;gap:18px}}
+
+/* ---------- tipografía ---------- */
+h1{font-size:22px;margin:0;line-height:1.2;text-wrap:balance}
+h2{font-size:16px;margin:0;line-height:1.3;text-wrap:balance}
+@media (min-width:720px){h1{font-size:26px}}
+.sub{color:var(--muted);font-size:13px;margin:4px 0 0}
 .num{font-family:var(--f-num);font-variant-numeric:tabular-nums}
-button{font:inherit;font-weight:600;cursor:pointer;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:9px 14px}
-button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
-button:disabled{opacity:.5;cursor:not-allowed}
-.status{font-size:13px;padding:8px 12px;border-radius:8px;background:var(--warn-bg);color:var(--warn)}
-.status[hidden]{display:none}
-.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
-@media (max-width:480px){.tabs button{padding:10px 10px;font-size:14px}.tile{padding:12px}}
-.tile{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
-.tile .k{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
-.tile .v{font-family:var(--f-num);font-size:clamp(17px,4.4vw,22px);white-space:nowrap;font-weight:600;margin-top:4px;font-variant-numeric:tabular-nums}
-.tile .h{font-size:12px;color:var(--muted);margin-top:2px}
+.money{font-family:var(--f-num);font-variant-numeric:tabular-nums;white-space:nowrap}
 .pos{color:var(--good)} .neg{color:var(--bad)}
-.grid{display:grid;grid-template-columns:minmax(300px,380px) 1fr;gap:18px;align-items:start}
-@media (max-width:820px){.grid{grid-template-columns:1fr}}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px}
-.col{display:flex;flex-direction:column;gap:18px;min-width:0}
-form{display:flex;flex-direction:column;gap:12px}
-.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.seg{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--line);border-radius:8px;overflow:hidden}
-.seg input{position:absolute;opacity:0;width:1px;height:1px}
-.seg label{flex-direction:row;justify-content:center;padding:9px;font-size:14px;cursor:pointer;color:var(--ink);font-weight:600;margin:0}
-.seg input:checked + label.g{background:var(--bad-bg);color:var(--bad)}
-.seg input:checked + label.i{background:var(--good-bg);color:var(--good)}
-.seg input:focus-visible + label{outline:2px solid var(--accent);outline-offset:-2px}
+.tag{font-size:12px;color:var(--muted)}
 .hint{font-size:12px;color:var(--muted);font-weight:400}
+
+/* ---------- controles ---------- */
+label{display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:600;color:var(--muted)}
+input,select,textarea{font:inherit;font-size:16px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-s);padding:10px 12px;min-height:44px;min-width:0;width:100%}
+@media (min-width:720px){input,select,textarea{font-size:15px}}
+input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button,a.btn{font:inherit;font-size:14px;font-weight:600;cursor:pointer;border-radius:var(--radius-s);border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:10px 14px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:6px;text-decoration:none;white-space:nowrap}
+button:hover,a.btn:hover{border-color:#c9d0de}
+button.primary,a.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button.primary:hover,a.btn.primary:hover{filter:brightness(1.07)}
+button:disabled{opacity:.5;cursor:not-allowed}
+.linkbtn{background:none;border:none;color:var(--accent);padding:0;min-height:0;font-size:13px;font-weight:600}
+.linkbtn:hover{text-decoration:underline}
+.small{min-height:34px;padding:6px 10px;font-size:13px}
+.del.confirm{background:var(--bad);color:#fff;border-color:var(--bad)}
+
+/* ---------- encabezado ---------- */
+header{display:flex;flex-direction:column;gap:14px}
+.brand{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.sheetname{font-size:13px;color:var(--muted);margin:6px 0 0;display:flex;align-items:center;gap:6px}
+.sheetname::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--good)}
+.sheetname a{color:var(--accent);font-weight:600}
+.toolbar{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:end}
+.toolbar .actions{grid-column:1/-1;display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+@media (min-width:720px){
+  .toolbar{display:flex;flex-wrap:wrap}
+  .toolbar label{width:190px}
+  .toolbar label.tc{width:160px}
+  .toolbar .actions{display:flex;margin-left:auto}
+}
+
+/* ---------- avisos ---------- */
+.status{font-size:14px;padding:10px 14px;border-radius:var(--radius-s);border:1px solid transparent}
+.status.info{background:var(--surface);color:var(--muted);border-color:var(--line)}
+.status.ok{background:var(--good-bg);color:var(--good)}
+.status.err{background:var(--bad-bg);color:var(--bad)}
 .msg{font-size:13px;min-height:18px;color:var(--good)}
 .msg.err{color:var(--bad)}
-.budget{display:flex;flex-direction:column;gap:10px}
-.brow{display:grid;grid-template-columns:minmax(110px,1.2fr) 2fr auto;gap:10px;align-items:center}
-.bname{font-size:14px;font-weight:600;overflow-wrap:anywhere}
-.bar{height:10px;background:var(--bg);border-radius:6px;overflow:hidden;border:1px solid var(--line)}
-.bar i{display:block;height:100%;background:var(--good)}
+.editing{margin:0;font-size:13px;background:var(--warn-bg);color:var(--warn);padding:8px 12px;border-radius:var(--radius-s)}
+
+/* ---------- pestañas ---------- */
+.tabs{position:sticky;top:0;z-index:5;display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;background:var(--bg);margin:0 -14px;padding:6px 14px 0;border-bottom:1px solid var(--line)}
+@media (min-width:720px){.tabs{margin:0;padding:0}}
+.tabs::-webkit-scrollbar{display:none}
+@media (max-width:719px){.tabs{-webkit-mask-image:linear-gradient(90deg,#000 85%,transparent);mask-image:linear-gradient(90deg,#000 85%,transparent)}}
+.tabs button{border:none;background:none;border-radius:10px 10px 0 0;padding:10px 12px;min-height:44px;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-1px;flex:0 0 auto}
+@media (min-width:720px){.tabs button{padding:10px 16px;font-size:15px}}
+.tabs button:hover{color:var(--ink)}
+.tabs button[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent)}
+.tabs .count{display:inline-block;min-width:18px;padding:0 6px;border-radius:999px;background:var(--bad);color:#fff;font-size:11px;line-height:18px;text-align:center}
+.panel{display:flex;flex-direction:column;gap:16px;padding-top:4px}
+.cols{display:grid;grid-template-columns:1fr;gap:16px;align-items:start}
+@media (min-width:900px){.cols{grid-template-columns:1fr 1fr;gap:18px}.cols.wide-left{grid-template-columns:1.25fr 1fr}}
+
+/* ---------- tarjetas ---------- */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);min-width:0}
+@media (min-width:720px){.card{padding:20px}}
+.card > h2{margin-bottom:14px}
+.cardhead{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.narrow{max-width:560px;width:100%}
+.empty{color:var(--muted);font-size:14px;padding:8px 0}
+
+/* ---------- indicadores ---------- */
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (min-width:720px){.tiles{grid-template-columns:repeat(3,1fr);gap:12px}}
+@media (min-width:1080px){.tiles{grid-template-columns:repeat(5,1fr)}}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;box-shadow:var(--shadow);min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;font-weight:400;white-space:normal;min-height:0}
+.tile.full{grid-column:1/-1}
+@media (min-width:720px){.tile.full{grid-column:auto}}
+.tile .k{font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+.tile .v{font-family:var(--f-num);font-variant-numeric:tabular-nums;font-size:clamp(17px,5vw,22px);font-weight:600;white-space:nowrap}
+.tile .h{font-size:12px;color:var(--muted)}
+.tilebtn{cursor:pointer;color:inherit}
+.tilebtn:hover{border-color:var(--accent)}
+
+/* ---------- lista de movimientos ---------- */
+.txlist{list-style:none;margin:0;padding:0}
+.txday{display:flex;justify-content:space-between;gap:10px;font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;padding:14px 0 6px;border-bottom:1px solid var(--line)}
+.txday:first-child{padding-top:0}
+.tx{display:grid;grid-template-columns:36px minmax(0,1fr) auto;column-gap:12px;row-gap:6px;align-items:center;padding:11px 0;border-bottom:1px solid var(--line)}
+.tx:last-child{border-bottom:none}
+.tx-ic{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font-weight:700;font-size:14px;background:var(--bad-bg);color:var(--bad)}
+.tx-ic.in{background:var(--good-bg);color:var(--good)}
+.tx-main{min-width:0}
+.tx-title{font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tx-sub{font-size:13px;color:var(--muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.tx-meta{font-size:12px;color:var(--muted);margin-top:1px}
+.tx-amt{text-align:right;font-family:var(--f-num);font-variant-numeric:tabular-nums;font-weight:600;font-size:14px;white-space:nowrap}
+.tx-amt small{display:block;font-weight:400;font-size:11px;color:var(--muted)}
+.tx-acts{grid-column:2/-1;display:flex;gap:6px;justify-content:flex-end}
+@media (min-width:720px){
+  .tx.has-acts{grid-template-columns:36px minmax(0,1fr) auto auto}
+  .tx-acts{grid-column:auto}
+}
+
+/* ---------- presupuesto ---------- */
+.budget{display:flex;flex-direction:column;gap:14px}
+.brow{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"name val" "bar bar";gap:6px 10px;align-items:center}
+.bname{grid-area:name;font-size:14px;font-weight:600;display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-width:0}
+.bar{grid-area:bar;height:8px;background:var(--surface-2);border-radius:6px;overflow:hidden;border:1px solid var(--line)}
+.bar i{display:block;height:100%;background:var(--good);border-radius:6px}
 .bar i.warn{background:var(--warn)} .bar i.bad{background:var(--bad)}
-.bval{font-size:12px;text-align:right;white-space:nowrap}
-.pill{display:inline-block;font-size:11px;font-weight:700;padding:2px 7px;border-radius:999px}
+.bval{grid-area:val;font-size:13px;text-align:right;white-space:nowrap}
+.bval .tag{font-size:12px}
+.pill{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap}
 .pill.ok{background:var(--good-bg);color:var(--good)}
 .pill.warn{background:var(--warn-bg);color:var(--warn)}
 .pill.bad{background:var(--bad-bg);color:var(--bad)}
-.cardhead{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
-.cardhead h2{margin:0}
-.tablewrap{overflow-x:auto}
-table{width:100%;border-collapse:collapse;font-size:14px}
-th{text-align:left;font-size:12px;color:var(--muted);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
-td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
-td.r,th.r{text-align:right}
-.tag{font-size:11px;color:var(--muted)}
-.del{padding:4px 8px;font-size:12px;font-weight:600}
-.del.confirm{background:var(--bad);color:#fff;border-color:var(--bad)}
-.empty{color:var(--muted);font-size:14px;padding:12px 0}
-details summary{cursor:pointer;font-weight:600;font-size:14px;color:var(--accent)}
-.bedit{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-top:12px}
-.bedit label{font-size:12px}
+.bedit{display:grid;grid-template-columns:1fr;gap:10px}
+@media (min-width:520px){.bedit{grid-template-columns:1fr 1fr}}
+
+/* ---------- formularios ---------- */
+form{display:flex;flex-direction:column;gap:14px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.row3{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.row3 > :first-child{grid-column:1/-1}
+@media (min-width:560px){.row3{grid-template-columns:1fr 1fr 1fr}.row3 > :first-child{grid-column:auto}}
+.seg{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--line);border-radius:var(--radius-s);overflow:hidden;background:var(--surface-2)}
+.seg input{position:absolute;opacity:0;width:1px;height:1px}
+.seg label{flex-direction:row;justify-content:center;align-items:center;min-height:44px;font-size:15px;cursor:pointer;color:var(--muted);font-weight:600;margin:0}
+.seg input:checked + label.g{background:var(--bad-bg);color:var(--bad)}
+.seg input:checked + label.i{background:var(--good-bg);color:var(--good)}
+.seg input:focus-visible + label{outline:2px solid var(--accent);outline-offset:-2px}
+.check{flex-direction:row;align-items:center;gap:10px;font-size:14px;color:var(--ink);font-weight:500}
+.check input{width:20px;height:20px;min-height:0;margin:0;flex:0 0 auto}
+.calc{font-size:13px;color:var(--muted);background:var(--surface-2);border:1px solid var(--line);border-radius:var(--radius-s);padding:10px 12px}
 .foot{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
-@media (prefers-reduced-motion:no-preference){.bar i{transition:width .3s ease}}
-</style>
-<style>
-[hidden]{display:none!important}
-a.btn{display:inline-flex;align-items:center;font-weight:600;text-decoration:none;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:9px 14px}
-a.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
-a.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
-.status.info{background:var(--bg);color:var(--muted);border:1px solid var(--line)}
-.status.ok{background:var(--good-bg);color:var(--good)}
-.status.err{background:var(--bad-bg);color:var(--bad)}
+.foot .primary{flex:1 1 200px}
+
+/* ---------- préstamos ---------- */
+.loans{display:flex;flex-direction:column;gap:12px}
+.loan{border:1px solid var(--line);border-radius:var(--radius-s);padding:14px;display:flex;flex-direction:column;gap:10px;background:var(--surface)}
+.loan.done{opacity:.65}
+.loanhead{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.loanhead > div{min-width:0}
+.loanhead strong{font-size:16px}
+.loanhead .tag{overflow-wrap:anywhere}
+.loanfacts{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px;font-size:14px}
+@media (min-width:560px){.loanfacts{grid-template-columns:repeat(3,1fr)}}
+.loanfacts span{display:block;color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.loanfacts b{font-family:var(--f-num);font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:600}
+.loanactions{display:flex;gap:8px;flex-wrap:wrap}
+.loanactions button{flex:1 1 auto}
+@media (min-width:560px){.loanactions button{flex:0 0 auto}}
+
+/* ---------- conexión ---------- */
 #conexion{max-width:560px}
 #conexion ol{margin:0 0 14px;padding-left:20px;color:var(--muted);font-size:14px}
-#conexion form{gap:12px}
-.sheetname{font-size:13px;color:var(--muted)}
-.sheetname a{color:var(--accent)}
-.linkbtn{background:none;border:none;color:var(--accent);padding:0;font-size:13px;font-weight:600;text-decoration:underline}
-.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none;margin-bottom:18px}
-.tabs::-webkit-scrollbar{display:none}
-.tabs button{border:none;background:none;border-radius:8px 8px 0 0;padding:10px 14px;font-weight:600;color:var(--muted);white-space:nowrap;border-bottom:3px solid transparent;margin-bottom:-1px}
-.tabs button:hover{color:var(--ink);background:var(--surface)}
-.tabs button[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent);background:var(--surface)}
-.tabs .count{display:inline-block;min-width:18px;padding:0 6px;border-radius:999px;background:var(--bad-bg);color:var(--bad);font-size:11px;line-height:18px;text-align:center;margin-left:4px}
-.panel{display:flex;flex-direction:column;gap:18px}
-.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,380px),1fr));gap:18px;align-items:start}
-.narrow{max-width:520px}
-.tilebtn{text-align:left;font:inherit;color:inherit;cursor:pointer;width:100%}
-.tilebtn:hover{border-color:var(--accent)}
-.recent{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
-.recent li{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line);font-size:14px}
-.recent li:last-child{border-bottom:none}
-.card h2{margin-bottom:12px}
-.cardhead h2{margin:0}
-.loans{display:flex;flex-direction:column;gap:12px}
-.loan{border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
-.loan.done{opacity:.7}
-.loanhead{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap}
-.loanhead strong{font-size:15px}
-.loanfacts{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;font-size:13px}
-.loanfacts span{display:block;color:var(--muted);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.03em}
-.loanactions{display:flex;gap:8px;flex-wrap:wrap}
-.loanactions button{padding:6px 10px;font-size:13px}
-.calc{font-size:13px;color:var(--muted);background:var(--bg);border-radius:8px;padding:8px 10px}
-.editing{margin:-4px 0 12px;font-size:13px;background:var(--warn-bg);color:var(--warn);padding:8px 10px;border-radius:8px}
-.acts{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
-.check{flex-direction:row;align-items:center;gap:8px;font-size:14px;color:var(--ink);font-weight:500}
-.check input{width:18px;height:18px;margin:0}
-.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
-@media (max-width:420px){.row3{grid-template-columns:1fr 1fr}}
+
+@media (prefers-reduced-motion:no-preference){.bar i{transition:width .3s ease}}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <div>
-      <h1>Mis Finanzas</h1>
-      <p class="sub">Registra gastos e ingresos en soles o dólares. Todo se guarda en tu hoja de Google Sheets.</p>
-      <p class="sheetname" id="sheetName" hidden></p>
+    <div class="brand">
+      <div>
+        <h1>Mis Finanzas</h1>
+        <p class="sub">Gastos, ingresos, préstamos y presupuesto en soles y dólares.</p>
+        <p class="sheetname" id="sheetName" hidden></p>
+      </div>
     </div>
     <div class="toolbar" id="toolbar" hidden>
       <label for="mes">Mes
         <input type="month" id="mes">
       </label>
-      <label for="tcDefault">Tipo de cambio (S/ por US$)
-        <input type="number" id="tcDefault" class="num" step="0.001" min="0.001" inputmode="decimal" style="width:130px">
+      <label for="tcDefault" class="tc" title="Soles por cada dólar">Tipo de cambio
+        <input type="number" id="tcDefault" class="num" step="0.001" min="0.001" inputmode="decimal">
       </label>
-      <button type="button" id="btnRefresh">Actualizar</button>
-      <a class="btn" id="lnkSheet" href="#" target="_blank" rel="noopener">Abrir hoja</a>
-      <a class="btn primary" id="lnkXlsx" href="#" target="_blank" rel="noopener">Descargar Excel</a>
+      <div class="actions">
+        <button type="button" id="btnRefresh">Actualizar</button>
+        <a class="btn" id="lnkSheet" href="#" target="_blank" rel="noopener">Abrir hoja</a>
+        <a class="btn primary" id="lnkXlsx" href="#" target="_blank" rel="noopener">Excel</a>
+      </div>
     </div>
   </header>
 
@@ -193,7 +252,7 @@ a.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
         <div class="tile"><div class="k">Gastos</div><div class="v neg" id="tGas">S/ 0.00</div><div class="h" id="tGasN">0 movimientos</div></div>
         <div class="tile"><div class="k">Balance</div><div class="v" id="tBal">S/ 0.00</div><div class="h" id="tAho">Tasa de ahorro: —</div></div>
         <button type="button" class="tile tilebtn" data-goto="prestamos"><div class="k">Deuda pendiente</div><div class="v" id="tDeu">S/ 0.00</div><div class="h" id="tDeuH">Sin préstamos activos</div></button>
-        <button type="button" class="tile tilebtn" data-goto="presupuesto"><div class="k">Presupuesto usado</div><div class="v" id="tPre">—</div><div class="h" id="tPreH">Define tus límites</div></button>
+        <button type="button" class="tile tilebtn full" data-goto="presupuesto"><div class="k">Presupuesto usado</div><div class="v" id="tPre">—</div><div class="h" id="tPreH">Define tus límites</div></button>
       </div>
       <div class="cols">
         <section class="card" aria-labelledby="rPresTitle">
@@ -202,17 +261,17 @@ a.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
         </section>
         <section class="card" aria-labelledby="rUltTitle">
           <div class="cardhead"><h2 id="rUltTitle">Últimos movimientos</h2><button type="button" class="linkbtn" data-goto="movimientos">Ver todos</button></div>
-          <ul class="recent" id="recent"></ul>
-          <button type="button" class="primary" data-goto="registrar" style="margin-top:12px">Registrar movimiento</button>
+          <ul class="txlist" id="recent"></ul>
+          <button type="button" class="primary" data-goto="registrar" style="margin-top:14px;width:100%">Registrar movimiento</button>
         </section>
       </div>
     </section>
 
     <!-- REGISTRAR -->
     <section class="panel" role="tabpanel" id="panel-registrar" aria-labelledby="tab-registrar" hidden>
-      <section class="card narrow" aria-labelledby="fTitle">
+      <section class="card narrow" aria-labelledby="fTitle" style="margin:0 auto">
         <h2 id="fTitle">Nuevo movimiento</h2>
-        <p class="editing" id="editNote" hidden></p>
+        <p class="editing" id="editNote" hidden style="margin-bottom:14px"></p>
         <form id="form" novalidate>
           <div class="seg" role="radiogroup" aria-label="Tipo de movimiento">
             <input type="radio" name="tipo" id="tipoG" value="Gasto" checked><label class="g" for="tipoG">Gasto</label>
@@ -239,7 +298,7 @@ a.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
           </label>
           <label for="nota">Descripción <span class="hint">(opcional)</span><input type="text" id="nota" maxlength="140" placeholder="Ej. Menú del almuerzo, recibo de luz…"></label>
           <div class="foot">
-            <button class="primary" type="submit" id="btnSave" style="flex:1">Guardar en la hoja</button>
+            <button class="primary" type="submit" id="btnSave">Guardar en la hoja</button>
             <button type="button" id="btnCancelEdit" hidden>Cancelar edición</button>
           </div>
           <div class="msg" id="msg" role="status" aria-live="polite"></div>
@@ -252,23 +311,18 @@ a.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
       <section class="card" aria-labelledby="mTitle">
         <div class="cardhead">
           <h2 id="mTitle">Movimientos del mes</h2>
-          <select id="filtro" aria-label="Filtrar movimientos" style="width:auto">
+          <select id="filtro" aria-label="Filtrar movimientos" style="width:auto;min-width:150px">
             <option value="">Todos</option><option value="Gasto">Solo gastos</option><option value="Ingreso">Solo ingresos</option>
           </select>
         </div>
-        <div class="tablewrap">
-          <table>
-            <thead><tr><th>Fecha</th><th>Detalle</th><th class="r">Monto</th><th class="r">En S/</th><th></th></tr></thead>
-            <tbody id="tbody"></tbody>
-          </table>
-        </div>
+        <ul class="txlist" id="tbody"></ul>
         <div class="empty" id="empty">Aún no hay movimientos este mes. Regístralos en la pestaña Registrar.</div>
       </section>
     </section>
 
     <!-- PRÉSTAMOS -->
     <section class="panel" role="tabpanel" id="panel-prestamos" aria-labelledby="tab-prestamos" hidden>
-      <div class="cols">
+      <div class="cols wide-left">
         <section class="card" aria-labelledby="lTitle" id="loansCard">
           <div class="cardhead"><h2 id="lTitle">Mis préstamos y créditos</h2><span class="tag" id="loanSum"></span></div>
           <div class="loans" id="loans"></div>
@@ -293,7 +347,7 @@ a.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
               <label for="pPrimer">Primer vencimiento<input type="date" id="pPrimer" required></label>
             </div>
             <label for="pNota">Descripción <span class="hint">(opcional)</span><input type="text" id="pNota" maxlength="140" placeholder="Ej. Crédito para la importación"></label>
-            <label class="check" for="pIngreso"><input type="checkbox" id="pIngreso" checked> Registrar lo recibido como ingreso <span class="hint">(categoría "Préstamo recibido")</span></label>
+            <label class="check" for="pIngreso"><input type="checkbox" id="pIngreso" checked><span>Registrar lo recibido como ingreso<span class="hint" style="display:block">En la categoría "Préstamo recibido"</span></span></label>
             <div class="calc" id="pCalc">Completa monto, cuotas y cuota para ver cuánto pagarás en total.</div>
             <button class="primary" type="submit" id="btnPrestamo">Guardar préstamo</button>
             <div class="msg" id="pMsg" role="status" aria-live="polite"></div>
@@ -311,7 +365,7 @@ a.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
         </section>
         <section class="card" aria-labelledby="bTitle">
           <h2 id="bTitle">Límites por categoría</h2>
-          <p class="hint" style="margin:0 0 4px">Deja en blanco las categorías sin límite. Se aplican a todos los meses.</p>
+          <p class="hint" style="margin:-6px 0 12px">Deja en blanco las categorías sin límite. Se aplican a todos los meses.</p>
           <div class="bedit" id="bEdit"></div>
           <div class="foot" style="margin-top:12px">
             <button type="button" id="btnBudget" class="primary">Guardar presupuesto</button>
@@ -321,7 +375,7 @@ a.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
       </div>
     </section>
 
-    <p style="margin-top:18px"><button type="button" class="linkbtn" id="btnDesconectar">Cambiar de hoja o de clave</button></p>
+    <p style="margin:22px 0 0;text-align:center"><button type="button" class="linkbtn" id="btnDesconectar">Cambiar de hoja o de clave</button></p>
   </div>
 </div>
 
@@ -551,29 +605,54 @@ a.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
       if(lim>0){ const p=g/lim; cls=p>1?"bad":p>=0.8?"warn":""; pill=p>1?'<span class="pill bad">Excedido</span>':p>=0.8?'<span class="pill warn">Cerca del límite</span>':'<span class="pill ok">OK</span>'; }
       else pill='<span class="pill warn">Sin límite</span>';
       const w = lim>0 ? Math.min(100,g/lim*100) : 100;
-      return `<div class="brow"><div class="bname">${esc(c)}<br>${pill}</div>
+      return `<div class="brow"><div class="bname">${esc(c)} ${pill}</div>
         <div class="bar" role="img" aria-label="${esc(c)}: ${lim>0?Math.round(g/lim*100)+"% usado":"sin límite"}"><i class="${lim>0?cls:"warn"}" style="width:${w}%"></i></div>
-        <div class="bval num">${fmtPEN(g)}<br><span class="tag">${lim>0?"de "+fmtPEN(lim):"—"}</span></div></div>`;
+        <div class="bval num">${fmtPEN(g)} <span class="tag">${lim>0?"/ "+fmtPEN(lim):""}</span></div></div>`;
     }).join("") : '<div class="empty">Sin gastos ni límites este mes. Fija tus límites en la pestaña Presupuesto.</div>';
 
-    const recientes = list.slice().sort((a,b)=>(b.fecha+(b.creado||"")).localeCompare(a.fecha+(a.creado||""))).slice(0,6);
-    $("recent").innerHTML = recientes.length ? recientes.map(x=>{
-      const [y,m,d]=x.fecha.split("-");
-      return `<li><span><span class="num tag">${d}/${m}</span> ${esc(x.categoria)}${x.nota?' <span class="tag">· '+esc(x.nota)+'</span>':""}</span><b class="num ${x.tipo==="Ingreso"?"pos":"neg"}">${x.tipo==="Ingreso"?"+":"−"}${fmtPEN(x.montoPEN)}</b></li>`;
-    }).join("") : '<li class="tag">Aún no hay movimientos este mes.</li>';
+    const orden=(a,b)=>(b.fecha+(b.creado||"")).localeCompare(a.fecha+(a.creado||""));
+    const recientes = list.slice().sort(orden).slice(0,6);
+    $("recent").innerHTML = recientes.length ? recientes.map(x=>txRow(x,false,true)).join("") : '<li class="empty">Aún no hay movimientos este mes.</li>';
 
     const f=$("filtro").value;
-    const rows = list.filter(x=>!f||x.tipo===f).sort((a,b)=> (b.fecha+(b.creado||"")).localeCompare(a.fecha+(a.creado||"")));
+    const rows = list.filter(x=>!f||x.tipo===f).sort(orden);
     $("empty").style.display = rows.length?"none":"block";
-    $("tbody").innerHTML = rows.map(x=>{
-      const sign = x.tipo==="Ingreso"?"pos":"neg";
-      const [y,m,d]=x.fecha.split("-");
-      return `<tr><td class="num">${d}/${m}</td>
-        <td><strong>${esc(x.categoria)}</strong>${x.nota?"<br>"+esc(x.nota):""}<br><span class="tag">${esc(x.metodo)}${x.moneda==="USD"?" · TC "+esc(x.tc):""}</span></td>
-        <td class="r num">${fmtCur(x.monto,x.moneda)}</td>
-        <td class="r num ${sign}">${x.tipo==="Ingreso"?"+":"−"}${fmtPEN(x.montoPEN)}</td>
-        <td class="r"><div class="acts"><button type="button" class="del" data-edit="${esc(x.id)}">Editar</button><button type="button" class="del${pendingDel===x.id?" confirm":""}" data-id="${esc(x.id)}">${pendingDel===x.id?"¿Eliminar?":"Borrar"}</button></div></td></tr>`;
-    }).join("");
+    let html="", dia="";
+    rows.forEach(x=>{
+      if(x.fecha!==dia){
+        dia=x.fecha;
+        const delDia=rows.filter(r=>r.fecha===dia);
+        const neto=round2(delDia.reduce((a,r)=>a+(r.tipo==="Ingreso"?r.montoPEN:-r.montoPEN),0));
+        html+=`<li class="txday"><span>${esc(diaLargo(dia))}</span><span class="money ${neto<0?"neg":"pos"}">${neto<0?"−":"+"}${fmtPEN(Math.abs(neto))}</span></li>`;
+      }
+      html+=txRow(x,true,false);
+    });
+    $("tbody").innerHTML = html;
+  }
+
+  const DIAS=["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
+  const MESES=["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+  function diaLargo(t){
+    const [y,m,d]=t.split("-").map(Number); const dt=new Date(y,m-1,d);
+    const hoy=today(); const ayer=(()=>{const a=new Date();a.setDate(a.getDate()-1);return a.getFullYear()+"-"+pad(a.getMonth()+1)+"-"+pad(a.getDate());})();
+    const base=DIAS[dt.getDay()]+" "+d+" "+MESES[m-1];
+    return t===hoy?"Hoy · "+base : t===ayer?"Ayer · "+base : base;
+  }
+  function txRow(x, conAcciones, conFecha){
+    const ing=x.tipo==="Ingreso";
+    const [y,m,d]=x.fecha.split("-");
+    const meta=[conFecha?d+"/"+m:"", x.metodo, x.moneda==="USD"?"TC "+x.tc:""].filter(Boolean).map(esc).join(" · ");
+    const conf=pendingDel===x.id;
+    return `<li class="tx${conAcciones?" has-acts":""}">
+      <div class="tx-ic${ing?" in":""}" aria-hidden="true">${esc((x.categoria||"?").charAt(0).toUpperCase())}</div>
+      <div class="tx-main">
+        <div class="tx-title">${esc(x.categoria)}</div>
+        ${x.nota?`<div class="tx-sub" title="${esc(x.nota)}">${esc(x.nota)}</div>`:""}
+        <div class="tx-meta">${meta}</div>
+      </div>
+      <div class="tx-amt ${ing?"pos":"neg"}">${ing?"+":"−"}${fmtPEN(x.montoPEN)}${x.moneda==="USD"?`<small>${fmtCur(x.monto,"USD")}</small>`:""}</div>
+      ${conAcciones?`<div class="tx-acts"><button type="button" class="small" data-edit="${esc(x.id)}">Editar</button><button type="button" class="small del${conf?" confirm":""}" data-id="${esc(x.id)}">${conf?"¿Eliminar?":"Borrar"}</button></div>`:""}
+    </li>`;
   }
 
   // ---------- préstamos ----------
@@ -613,19 +692,21 @@ a.btn[aria-disabled="true"]{opacity:.5;pointer-events:none}
       const pct = e.total>0 ? Math.min(100,e.pagado/e.total*100) : 0;
       const del = pendingDel===p.id;
       return `<div class="loan${e.saldo<=0?" done":""}">
-        <div class="loanhead"><div><strong>${esc(p.entidad)}</strong>${p.nota?' · <span class="tag">'+esc(p.nota)+'</span>':""}<br><span class="tag">Recibido ${fmtD(parseD(p.fecha))} · ${esc(p.frecuencia)}</span></div>${pill}</div>
+        <div class="loanhead"><div><strong>${esc(p.entidad)}</strong><div class="tag">${p.nota?esc(p.nota)+" · ":""}Recibido ${fmtD(parseD(p.fecha))} · ${p.cuotas===1?"Pago único":esc(p.frecuencia)}</div></div>${pill}</div>
         <div class="bar" role="img" aria-label="Pagado ${Math.round(pct)}%"><i style="width:${pct}%"></i></div>
         <div class="loanfacts">
           <div><span>Saldo pendiente</span><b class="num">${fmtPEN(e.saldo)}</b></div>
           <div><span>Cuotas pagadas</span><b class="num">${e.nPagadas} de ${p.cuotas}</b></div>
           <div><span>Próxima cuota</span><b class="num">${e.prox?fmtD(e.prox):"—"}</b></div>
           <div><span>Cuota</span><b class="num">${fmtPEN(p.cuota)}</b></div>
-          <div><span>Recibiste / pagarás</span><b class="num">${fmtPEN(p.monto)} / ${fmtPEN(e.total)}</b></div>
+          <div><span>Recibiste</span><b class="num">${fmtPEN(p.monto)}</b></div>
+          <div><span>Total a pagar</span><b class="num">${fmtPEN(e.total)}</b></div>
           <div><span>Interés y costos</span><b class="num ${e.interes>0?"neg":""}">${fmtPEN(e.interes)}</b></div>
+          <div><span>Pagado</span><b class="num">${fmtPEN(e.pagado)}</b></div>
         </div>
         <div class="loanactions">
           ${e.saldo>0?`<button type="button" class="primary" data-pagar="${esc(p.id)}">Pagar cuota ${Math.min(e.nPagadas+1,p.cuotas)}</button>`:""}
-          ${!e.ingreso?`<button type="button" data-ingreso="${esc(p.id)}">Registrar los ${fmtPEN(p.monto)} recibidos como ingreso</button>`:""}
+          ${!e.ingreso?`<button type="button" data-ingreso="${esc(p.id)}">Registrar ${fmtPEN(p.monto)} como ingreso</button>`:""}
           <button type="button" class="del${del?" confirm":""}" data-borrarp="${esc(p.id)}">${del?"¿Eliminar préstamo?":"Eliminar"}</button>
         </div>
       </div>`;
