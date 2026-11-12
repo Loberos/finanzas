@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
+<meta name="theme-color" content="#2350d8">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="icon" href="icon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-title" content="Finanzas">
 <title>Mis Finanzas</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -30,6 +36,8 @@ body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:1
 
 /* ---------- tipografía ---------- */
 h1{font-size:22px;margin:0;line-height:1.2;text-wrap:balance}
+h1.logo{display:flex;align-items:center;gap:10px}
+h1.logo img{width:34px;height:34px;border-radius:9px;flex:0 0 auto}
 h2{font-size:16px;margin:0;line-height:1.3;text-wrap:balance}
 @media (min-width:720px){h1{font-size:26px}}
 .sub{color:var(--muted);font-size:13px;margin:4px 0 0}
@@ -226,6 +234,17 @@ form{display:flex;flex-direction:column;gap:14px}
 .accacts button{flex:1 1 auto}
 .accacts button:first-child{flex-basis:100%}
 .accform{display:flex;flex-direction:column;gap:10px;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--radius-s);padding:12px}
+.acc.colored{border-left:5px solid var(--c)}
+.accchip .n::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--c,var(--line));margin-right:6px;vertical-align:1px}
+.swatches{display:flex;gap:8px;flex-wrap:wrap}
+.swatches input{position:absolute;opacity:0;width:1px;height:1px}
+.swatches label{width:30px;height:30px;min-height:0;border-radius:50%;background:var(--c);cursor:pointer;border:3px solid transparent;box-shadow:0 0 0 1px var(--line)}
+.swatches input:checked + label{border-color:var(--surface);box-shadow:0 0 0 2px var(--c)}
+.swatches input:focus-visible + label{outline:2px solid var(--accent);outline-offset:2px}
+.minibar{height:6px;flex:1 1 80px;background:var(--surface-2);border:1px solid var(--line);border-radius:4px;overflow:hidden;align-self:center}
+.minibar i{display:block;height:100%;background:var(--good)} .minibar i.warn{background:var(--warn)} .minibar i.bad{background:var(--bad)}
+.scope{display:flex;flex-wrap:wrap;gap:10px;align-items:end}
+.scope label{flex:1 1 220px;max-width:340px}
 .notice{font-size:14px;background:var(--warn-bg);color:var(--warn);border-radius:var(--radius-s);padding:10px 14px}
 
 /* ---------- guardado en segundo plano ---------- */
@@ -269,7 +288,7 @@ form{display:flex;flex-direction:column;gap:14px}
   <header>
     <div class="brand">
       <div>
-        <h1>Mis Finanzas</h1>
+        <h1 class="logo"><img src="icon.svg" alt="" width="36" height="36">Mis Finanzas</h1>
         <p class="sub">Gastos, ingresos, préstamos y presupuesto en soles y dólares.</p>
         <p class="sheetname" id="sheetName" hidden></p>
       </div>
@@ -527,9 +546,14 @@ form{display:flex;flex-direction:column;gap:14px}
 
     <!-- PRESUPUESTO -->
     <section class="panel" role="tabpanel" id="panel-presupuesto" aria-labelledby="tab-presupuesto" hidden>
+      <div class="scope" id="scopeWrap" hidden>
+        <label for="presScope">Presupuesto de<select id="presScope"></select></label>
+        <span class="hint" id="scopeHint">Cada cuenta puede tener sus propios límites. "Todas las cuentas" es tu presupuesto general.</span>
+      </div>
+      <p class="notice" id="scopeAviso" hidden>Para guardar presupuestos por cuenta, actualiza el Apps Script de tu hoja a la versión 4 y publica una Nueva versión.</p>
       <div class="cols">
         <section class="card" aria-labelledby="pTitle">
-          <div class="cardhead"><h2 id="pTitle">Cómo vas este mes</h2><span class="tag">Gastos convertidos a S/</span></div>
+          <div class="cardhead"><h2 id="pTitle">Cómo vas este mes</h2><span class="tag" id="pTag">Gastos convertidos a S/</span></div>
           <div class="budget" id="budget2"></div>
         </section>
         <section class="card" aria-labelledby="bTitle">
@@ -576,6 +600,9 @@ form{display:flex;flex-direction:column;gap:14px}
   let cuentas=[];
   const KEY_ULT_CTA="finanzas.ultimaCuenta";
   let cfg={tc:3.75, presupuestos:{}};
+  let ajustes={};          // opciones guardadas en la hoja (Config!B2, Apps Script v4)
+  let presScope="";        // "" = todas las cuentas; si no, ID de cuenta
+  const COLORES=["#2350d8","#7c3aed","#0f7f56","#c0352a","#a86400","#0e7490","#db2777","#64748b"];
   let pendingDel=null;
 
   // ---------- conexión con la hoja (Apps Script) ----------
@@ -605,6 +632,8 @@ form{display:flex;flex-direction:column;gap:14px}
     movs = Array.isArray(data.movimientos) ? data.movimientos : [];
     prestamos = Array.isArray(data.prestamos) ? data.prestamos : [];
     if(data.config) cfg = {tc:Number(data.config.tc)||cfg.tc, presupuestos:Object.assign({},data.config.presupuestos||{})};
+    servidorV4 = Number(data.version)>=4;
+    ajustes = data.config && data.config.ajustes && typeof data.config.ajustes==="object" ? data.config.ajustes : {};
     if(data.hoja){
       $("lnkSheet").href = data.hoja.url;
       $("lnkXlsx").href = "https://docs.google.com/spreadsheets/d/"+encodeURIComponent(data.hoja.id)+"/export?format=xlsx";
@@ -622,7 +651,7 @@ form{display:flex;flex-direction:column;gap:14px}
   // ---------- guardado en segundo plano ----------
   // La página se actualiza al instante; los cambios se envían a la hoja en orden, uno tras otro.
   // Al terminar la cola se toma la respuesta de la hoja como la versión real.
-  const cola=[]; let procesando=false, ultimaRespuesta=null, syncTimer=null, servidorV2=false, servidorV3=false;
+  const cola=[]; let procesando=false, ultimaRespuesta=null, syncTimer=null, servidorV2=false, servidorV3=false, servidorV4=false;
   // Con el Apps Script v1 (sin lote/editar/reordenar) cada paso se traduce a acciones antiguas.
   function pasosV1(p){
     if(p.accion==="editar") return [{accion:"borrar",id:p.mov.id},{accion:"agregar",mov:p.mov}];
@@ -855,12 +884,62 @@ form{display:flex;flex-direction:column;gap:14px}
     tcTimer=setTimeout(()=>encolar("el tipo de cambio",[{accion:"config",config:{tc:v}}]),900);
   });
 
+  // ---------- presupuesto (general y por cuenta) ----------
+  function presDe(scope){ return scope ? Object.assign({}, ((ajustes.presCuenta||{})[scope])||{}) : (cfg.presupuestos||{}); }
+  function gastoPorCat(scope){
+    const m=$("mes").value, out={};
+    movs.forEach(x=>{ if(x.mes!==m||x.tipo!=="Gasto"||esTransf(x)||x.categoria===CAT_AJUSTE) return; if(scope&&x.cuenta!==scope) return; out[x.categoria]=(out[x.categoria]||0)+x.montoPEN; });
+    return out;
+  }
+  function usoPres(scope){
+    const pres=presDe(scope), porCat=gastoPorCat(scope);
+    const total=Object.values(pres).reduce((a,b)=>a+(Number(b)||0),0);
+    const gasto=Object.keys(pres).filter(k=>pres[k]>0).reduce((a,k)=>a+(porCat[k]||0),0);
+    return {total,gasto,p: total>0?gasto/total:0};
+  }
+  function budgetHTML(pres, porCat, vacio){
+    const cats = CAT_GASTO.filter(c=>(pres[c]>0)||(porCat[c]>0));
+    Object.keys(porCat).forEach(c=>{ if(!cats.includes(c)) cats.push(c); });
+    return cats.length ? cats.map(c=>{
+      const lim=Number(pres[c])||0, g=porCat[c]||0;
+      let cls="", pill;
+      if(lim>0){ const p=g/lim; cls=p>1?"bad":p>=0.8?"warn":""; pill=p>1?'<span class="pill bad">Excedido</span>':p>=0.8?'<span class="pill warn">Cerca del límite</span>':'<span class="pill ok">OK</span>'; }
+      else pill='<span class="pill warn">Sin límite</span>';
+      const w = lim>0 ? Math.min(100,g/lim*100) : 100;
+      return `<div class="brow"><div class="bname">${esc(c)} ${pill}</div>
+        <div class="bar" role="img" aria-label="${esc(c)}: ${lim>0?Math.round(g/lim*100)+"% usado":"sin límite"}"><i class="${lim>0?cls:"warn"}" style="width:${w}%"></i></div>
+        <div class="bval num">${fmtPEN(g)} <span class="tag">${lim>0?"/ "+fmtPEN(lim):""}</span></div></div>`;
+    }).join("") : `<div class="empty">${vacio}</div>`;
+  }
+  function renderPresupuestoScope(){
+    const act=cuentasActivas();
+    if(presScope && !act.some(c=>c.id===presScope)) presScope="";
+    $("scopeWrap").hidden=!act.length;
+    $("presScope").innerHTML='<option value="">Todas las cuentas (general)</option>'+act.map(c=>`<option value="${esc(c.id)}">${esc(c.nombre)}</option>`).join("");
+    $("presScope").value=presScope;
+    $("scopeAviso").hidden = !presScope || servidorV4;
+    $("btnBudget").disabled = !!presScope && !servidorV4;
+    $("pTag").textContent = presScope ? "Solo gastos de "+nombreCuenta(presScope) : "Gastos de todas las cuentas, en S/";
+    $("bTitle").textContent = presScope ? "Límites de "+nombreCuenta(presScope) : "Límites por categoría";
+    $("budget2").innerHTML = budgetHTML(presDe(presScope), gastoPorCat(presScope), presScope?"Esta cuenta no tiene gastos ni límites este mes.":"Sin gastos ni límites este mes.");
+  }
+  $("presScope").addEventListener("change",()=>{ presScope=$("presScope").value; renderPresupuestoScope(); renderBudgetEditor(); $("bMsg").textContent=""; });
+
+  function guardarAjustes(desc, extra){ encolar(desc, (extra||[]).concat([{accion:"config",config:{ajustes:JSON.parse(JSON.stringify(ajustes))}}])); }
+
   $("btnBudget").addEventListener("click", async ()=>{
     const p={};
     $("bEdit").querySelectorAll("input").forEach(i=>{ const v=Number(i.value); if(v>0) p[i.dataset.cat]=round2(v); });
-    cfg.presupuestos=p; render();
-    $("bMsg").textContent="Presupuesto actualizado."; $("bMsg").className="msg";
-    encolar("el presupuesto",[{accion:"config",config:{presupuestos:p}}]);
+    if(presScope){
+      if(!servidorV4) return;
+      ajustes.presCuenta=Object.assign({},ajustes.presCuenta||{}); ajustes.presCuenta[presScope]=p; render();
+      $("bMsg").textContent="Presupuesto de "+nombreCuenta(presScope)+" actualizado."; $("bMsg").className="msg";
+      guardarAjustes("el presupuesto de "+nombreCuenta(presScope));
+    } else {
+      cfg.presupuestos=p; render();
+      $("bMsg").textContent="Presupuesto actualizado."; $("bMsg").className="msg";
+      encolar("el presupuesto",[{accion:"config",config:{presupuestos:p}}]);
+    }
   });
 
   $("mes").addEventListener("change",()=>{pendingDel=null;render();});
@@ -890,18 +969,8 @@ form{display:flex;flex-direction:column;gap:14px}
       $("tPreH").textContent=fmtPEN(gastoPres)+" de "+fmtPEN(totalPres);
     } else { $("tPre").textContent="—"; $("tPre").className="v"; $("tPreH").textContent="Define tus límites"; }
 
-    const cats = CAT_GASTO.filter(c=>(pres[c]>0)||(porCat[c]>0));
-    Object.keys(porCat).forEach(c=>{ if(!cats.includes(c)) cats.push(c); });
-    $("budget").innerHTML = $("budget2").innerHTML = cats.length ? cats.map(c=>{
-      const lim=Number(pres[c])||0, g=porCat[c]||0;
-      let cls="", pill;
-      if(lim>0){ const p=g/lim; cls=p>1?"bad":p>=0.8?"warn":""; pill=p>1?'<span class="pill bad">Excedido</span>':p>=0.8?'<span class="pill warn">Cerca del límite</span>':'<span class="pill ok">OK</span>'; }
-      else pill='<span class="pill warn">Sin límite</span>';
-      const w = lim>0 ? Math.min(100,g/lim*100) : 100;
-      return `<div class="brow"><div class="bname">${esc(c)} ${pill}</div>
-        <div class="bar" role="img" aria-label="${esc(c)}: ${lim>0?Math.round(g/lim*100)+"% usado":"sin límite"}"><i class="${lim>0?cls:"warn"}" style="width:${w}%"></i></div>
-        <div class="bval num">${fmtPEN(g)} <span class="tag">${lim>0?"/ "+fmtPEN(lim):""}</span></div></div>`;
-    }).join("") : '<div class="empty">Sin gastos ni límites este mes. Fija tus límites en la pestaña Presupuesto.</div>';
+    $("budget").innerHTML = budgetHTML(pres, porCat, "Sin gastos ni límites este mes. Fija tus límites en la pestaña Presupuesto.");
+    renderPresupuestoScope();
 
     const orden=(a,b)=>(b.fecha+(b.creado||"")).localeCompare(a.fecha+(a.creado||""));
     const recientes = list.slice().sort(orden).slice(0,6);
@@ -994,12 +1063,15 @@ form{display:flex;flex-direction:column;gap:14px}
     const act=cuentasActivas(), el=$("accStrip");
     el.hidden=!act.length; if(!act.length){ el.innerHTML=""; return; }
     const sin=sinCuentaMovs();
-    el.innerHTML = act.map(c=>{ const v=saldoCuenta(c.id); return `<button type="button" class="accchip" data-vercuenta="${esc(c.id)}"><span class="n">${esc(c.nombre)}</span><span class="s ${v<0?"neg":""}">${signo(v)}</span></button>`; }).join("")
+    el.innerHTML = act.map(c=>{ const v=saldoCuenta(c.id); return `<button type="button" class="accchip" style="--c:${colorCuenta(c.id)}" data-vercuenta="${esc(c.id)}"><span class="n">${esc(c.nombre)}</span><span class="s ${v<0?"neg":""}">${signo(v)}</span></button>`; }).join("")
       + (sin.length?`<button type="button" class="accchip" data-goto="cuentas"><span class="n">Sin cuenta</span><span class="s">${signo(saldoCuenta(""))}</span></button>`:"");
   }
 
   let ctaAccion=null; // {id, tipo:"ajustar"|"editar"}
+  function infoCuenta(id){ return Object.assign({detalle:"",color:""}, ((ajustes.cuentaInfo||{})[id])||{}); }
+  function colorCuenta(id){ const i=infoCuenta(id); if(i.color) return i.color; const k=cuentas.findIndex(c=>c.id===id); return COLORES[(k<0?0:k)%COLORES.length]; }
   function tarjetaCuenta(c){
+    const info=infoCuenta(c.id), col=colorCuenta(c.id);
     const v=saldoCuenta(c.id), mc=mesCuenta(c.id), usados=movs.some(x=>x.cuenta===c.id||x.destino===c.id);
     const del=pendingDel==="cta:"+c.id;
     let form="";
@@ -1009,11 +1081,17 @@ form{display:flex;flex-direction:column;gap:14px}
     if(ctaAccion&&ctaAccion.id===c.id&&ctaAccion.tipo==="editar") form=`<form class="accform" data-edform="${esc(c.id)}" novalidate>
         <label for="en-${esc(c.id)}">Nombre<input type="text" id="en-${esc(c.id)}" maxlength="40" value="${esc(c.nombre)}"></label>
         <label for="et-${esc(c.id)}">Tipo<select id="et-${esc(c.id)}">${["Billetera digital","Banco","Efectivo","Tarjeta de crédito","App de préstamos","Otro"].map(t=>`<option${t===c.tipo?" selected":""}>${t}</option>`).join("")}</select></label>
+        ${servidorV4?`<label for="ed-${esc(c.id)}">Detalle <span class="hint">(opcional: número, titular, para qué la usas…)</span><input type="text" id="ed-${esc(c.id)}" maxlength="80" value="${esc(info.detalle)}" placeholder="Ej. Cuenta sueldo ****1234"></label>
+        <fieldset style="border:none;margin:0;padding:0"><legend class="hint" style="font-weight:600;margin-bottom:6px">Color</legend><div class="swatches">${COLORES.map((k,n)=>`<input type="radio" name="ec-${esc(c.id)}" id="ec-${esc(c.id)}-${n}" value="${k}"${k===col?" checked":""}><label for="ec-${esc(c.id)}-${n}" style="--c:${k}" title="Color ${n+1}"></label>`).join("")}</div></fieldset>`
+        :'<span class="hint">Para agregar detalle y color, actualiza el Apps Script a la versión 4.</span>'}
         <div class="foot"><button type="submit" class="primary small">Guardar</button><button type="button" class="small" data-ctacancel>Cancelar</button></div></form>`;
-    return `<div class="acc">
-      <div class="acchead"><div><strong>${esc(c.nombre)}</strong><div class="tag">${esc(c.tipo)}${c.archivada?" · archivada":""}</div></div></div>
+    const up=usoPres(c.id);
+    const presLinea = up.total>0 ? `<div class="accmes"><span>Presupuesto:</span><span class="minibar"><i class="${up.p>1?"bad":up.p>=0.8?"warn":""}" style="width:${Math.min(100,up.p*100)}%"></i></span><b class="${up.p>1?"neg":""}">${Math.round(up.p*100)}%</b><span>${fmtPEN(up.gasto)} de ${fmtPEN(up.total)}</span></div>` : "";
+    return `<div class="acc colored" style="--c:${col}">
+      <div class="acchead"><div><strong>${esc(c.nombre)}</strong><div class="tag">${esc(c.tipo)}${c.archivada?" · archivada":""}${info.detalle?" · "+esc(info.detalle):""}</div></div></div>
       <div class="accsaldo ${v<0?"neg":""}">${signo(v)}</div>
       <div class="accmes"><span>Este mes:</span><b class="pos">+${fmtPEN(mc.ing)}</b><b class="neg">−${fmtPEN(mc.gas)}</b></div>
+      ${presLinea}
       ${(()=>{ const ps=prestamos.filter(p=>cuentaDePrestamo(p)===c.id).map(p=>({p,e:estadoPrestamo(p)})).filter(x=>x.e.saldo>0);
         return ps.length?`<div class="accmes"><span>Préstamos:</span>${ps.map(x=>`<span>${esc(x.p.entidad)} <b class="neg">${fmtPEN(x.e.saldo)}</b></span>`).join("")}<button type="button" class="linkbtn" data-goto="prestamos">Ver</button></div>`:""; })()}
       ${form}
@@ -1021,7 +1099,8 @@ form{display:flex;flex-direction:column;gap:14px}
         ${c.archivada?`<button type="button" class="small" data-restaurar="${esc(c.id)}">Restaurar</button>`:
           `<button type="button" class="small" data-vercuenta="${esc(c.id)}">Ver movimientos</button>
            <button type="button" class="small" data-ajustar="${esc(c.id)}">Ajustar saldo</button>
-           <button type="button" class="small" data-editarcta="${esc(c.id)}">Editar</button>`}
+           <button type="button" class="small" data-editarcta="${esc(c.id)}">Editar</button>
+           <button type="button" class="small" data-prescta="${esc(c.id)}">Presupuesto</button>`}
         ${usados ? (c.archivada?"":`<button type="button" class="small" data-archivar="${esc(c.id)}" title="Tiene movimientos: se oculta pero se conserva">Archivar</button>`)
                  : `<button type="button" class="small del${del?" confirm":""}" data-borrarcta="${esc(c.id)}">${del?"¿Eliminar?":"Eliminar"}</button>`}
       </div></div>`;
@@ -1084,6 +1163,7 @@ form{display:flex;flex-direction:column;gap:14px}
     const g=(attr)=>{ const el=t.closest("["+attr+"]"); return el?el.getAttribute(attr):null; };
     let id;
     if((id=g("data-ajustar"))){ ctaAccion={id,tipo:"ajustar"}; renderCuentas(); const i=$("aj-"+id); if(i){ i.focus(); i.select(); } return; }
+    if((id=g("data-prescta"))){ presScope=id; showTab("presupuesto"); window.scrollTo(0,0); renderPresupuestoScope(); renderBudgetEditor(); return; }
     if((id=g("data-editarcta"))){ ctaAccion={id,tipo:"editar"}; renderCuentas(); const i=$("en-"+id); if(i) i.focus(); return; }
     if(t.closest("[data-ctacancel]")){ ctaAccion=null; renderCuentas(); return; }
     if((id=g("data-archivar"))||(id=g("data-restaurar"))){
@@ -1115,8 +1195,15 @@ form{display:flex;flex-direction:column;gap:14px}
     if(f.matches("[data-edform]")){
       e.preventDefault(); const id=f.getAttribute("data-edform"); const c=cuentaPorId(id);
       const nombre=$("en-"+id).value.trim(); if(!nombre) return;
-      const nueva=Object.assign({},c,{nombre,tipo:$("et-"+id).value}); cuentas=cuentas.map(x=>x.id===id?nueva:x); ctaAccion=null; render();
-      encolar("la cuenta "+nombre,[{accion:"cuenta_editar",cuenta:nueva}]);
+      const nueva=Object.assign({},c,{nombre,tipo:$("et-"+id).value}); cuentas=cuentas.map(x=>x.id===id?nueva:x); ctaAccion=null;
+      const pasos=[{accion:"cuenta_editar",cuenta:nueva}];
+      if(servidorV4 && $("ed-"+id)){
+        const color=(f.querySelector(`input[name="ec-${CSS.escape(id)}"]:checked`)||{}).value||"";
+        ajustes.cuentaInfo=Object.assign({},ajustes.cuentaInfo||{}); ajustes.cuentaInfo[id]={detalle:$("ed-"+id).value.trim(),color};
+        pasos.push({accion:"config",config:{ajustes:JSON.parse(JSON.stringify(ajustes))}});
+      }
+      render(); setStatus(`Cuenta ${nombre} actualizada.`,"ok");
+      encolar("la cuenta "+nombre,pasos);
     }
     if(f.id==="formConvertir"){
       e.preventDefault(); const nombre=$("cvNombre").value.trim();
@@ -1489,7 +1576,7 @@ form{display:flex;flex-direction:column;gap:14px}
   });
 
   function renderBudgetEditor(){
-    const pres=cfg.presupuestos||{};
+    const pres=presDe(presScope);
     $("bEdit").innerHTML = CAT_GASTO.map((c,i)=>`<label for="b${i}">${esc(c)}<input type="number" class="num" id="b${i}" data-cat="${esc(c)}" min="0" step="1" inputmode="decimal" placeholder="0" value="${pres[c]?pres[c]:""}"></label>`).join("");
   }
 

@@ -7,9 +7,11 @@
  *
  * Versión 2: envío en lote, edición en el mismo lugar y orden sin reescribir filas.
  * Versión 3: cuentas (cada movimiento pertenece a una cuenta; saldo por cuenta).
+ * Versión 4: 'ajustes' flexibles guardados en Config!B2 (presupuesto por cuenta, datos de cuentas y
+ *            futuras opciones de la página sin tener que volver a cambiar este script).
  */
 
-const VERSION = 3;
+const VERSION = 4;
 
 // Clave secreta: el formulario la envía en cada pedido. Cámbiala por una tuya.
 const CLAVE = 'CAMBIA_ESTA_CLAVE';
@@ -300,7 +302,13 @@ function leerConfig_() {
   const filas = p.getRange(4, 1, CAT_GASTO.length, 2).getValues();
   const presupuestos = {};
   filas.forEach(function (r) { if (r[0] && Number(r[1]) > 0) presupuestos[r[0]] = Number(r[1]); });
-  return { tc: leerTc_(), presupuestos: presupuestos };
+  return { tc: leerTc_(), presupuestos: presupuestos, ajustes: leerAjustes_() };
+}
+
+/** Objeto JSON libre que la página usa para guardar sus opciones (Config!B2). */
+function leerAjustes_() {
+  const cfg = ss_().getSheetByName(HOJA_CFG);
+  try { return JSON.parse(String(cfg.getRange('B2').getValue() || '{}')) || {}; } catch (e) { return {}; }
 }
 
 function agregar_(m) {
@@ -359,6 +367,12 @@ function guardarConfig_(c) {
   if (!c) return;
   const ss = ss_();
   if (Number(c.tc) > 0) ss.getSheetByName(HOJA_CFG).getRange('B1').setValue(Number(c.tc));
+  if (c.ajustes && typeof c.ajustes === 'object') {
+    const txt = JSON.stringify(c.ajustes);
+    if (txt.length > 45000) throw new Error('Los ajustes son demasiado grandes');
+    const cfg = ss.getSheetByName(HOJA_CFG);
+    cfg.getRange('A2:B2').setValues([['Ajustes de la página (no editar)', txt]]);
+  }
   if (c.presupuestos) {
     const p = ss.getSheetByName(HOJA_PRES);
     const cats = p.getRange(4, 1, CAT_GASTO.length, 1).getValues();
