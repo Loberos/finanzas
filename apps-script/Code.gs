@@ -6,9 +6,10 @@
  * cambia la CLAVE y publícalo como "Aplicación web".
  *
  * Versión 2: envío en lote, edición en el mismo lugar y orden sin reescribir filas.
+ * Versión 3: cuentas (cada movimiento pertenece a una cuenta; saldo por cuenta).
  */
 
-const VERSION = 2;
+const VERSION = 3;
 
 // Clave secreta: el formulario la envía en cada pedido. Cámbiala por una tuya.
 const CLAVE = 'CAMBIA_ESTA_CLAVE';
@@ -19,12 +20,22 @@ const HOJA_RES = 'Resumen mensual';
 const HOJA_CAT = 'Gastos por categoría';
 const HOJA_CFG = 'Config';
 const HOJA_PRE = 'Préstamos';
+const HOJA_CTA = 'Cuentas';
+
+// Categorías especiales: no son ingreso ni gasto real
+const CAT_TRANSF = 'Transferencia entre mis cuentas';
+const CAT_AJUSTE = 'Ajuste de saldo';
 
 const CAT_GASTO = ['Alimentación', 'Transporte', 'Vivienda / Alquiler', 'Servicios (luz, agua, internet)', 'Salud', 'Educación', 'Entretenimiento', 'Ropa y cuidado personal', 'Deudas / Tarjetas', 'Ahorro e inversión', 'Otros gastos'];
 
 // Columnas de Movimientos (1 = A)
-const COL = { id: 1, fecha: 2, mes: 3, tipo: 4, categoria: 5, nota: 6, metodo: 7, moneda: 8, monto: 9, tc: 10, montoPEN: 11, creado: 12, prestamo: 13 };
-const ENCABEZADOS = ['ID', 'Fecha', 'Mes', 'Tipo', 'Categoría', 'Descripción', 'Medio de pago', 'Moneda', 'Monto', 'Tipo de cambio', 'Monto S/', 'Registrado', 'Préstamo'];
+const COL = { id: 1, fecha: 2, mes: 3, tipo: 4, categoria: 5, nota: 6, metodo: 7, moneda: 8, monto: 9, tc: 10, montoPEN: 11, creado: 12, prestamo: 13, cuenta: 14, destino: 15 };
+const ENCABEZADOS = ['ID', 'Fecha', 'Mes', 'Tipo', 'Categoría', 'Descripción', 'Medio de pago', 'Moneda', 'Monto', 'Tipo de cambio', 'Monto S/', 'Registrado', 'Préstamo', 'Cuenta', 'Cuenta destino'];
+
+// Columnas de Cuentas (1 = A)
+const CCOL = { id: 1, nombre: 2, tipo: 3, archivada: 4, creado: 5, saldo: 6 };
+const C_ENCABEZADOS = ['ID', 'Nombre', 'Tipo', 'Archivada', 'Registrado', 'Saldo actual S/'];
+const TIPOS_CUENTA = ['Billetera digital', 'Banco', 'Efectivo', 'Tarjeta de crédito', 'App de préstamos', 'Otro'];
 
 // Columnas de Préstamos (1 = A)
 const PCOL = { id: 1, entidad: 2, nota: 3, fecha: 4, monto: 5, cuotas: 6, cuota: 7, frecuencia: 8, primer: 9, creado: 16 };
@@ -66,6 +77,9 @@ function ejecutar_(b) {
     case 'config': return guardarConfig_(b.config);
     case 'prestamo_agregar': return agregarPrestamo_(b.prestamo);
     case 'prestamo_borrar': return borrarPrestamo_(b.id);
+    case 'cuenta_agregar': return agregarCuenta_(b.cuenta);
+    case 'cuenta_editar': return editarCuenta_(b.cuenta);
+    case 'cuenta_borrar': return borrarCuenta_(b.id);
     default: throw new Error('Acción desconocida');
   }
 }
@@ -139,9 +153,17 @@ function configurar_() {
     mov.getRange('D2:D').setDataValidation(reglas[0]);
     mov.getRange('H2:H').setDataValidation(reglas[1]);
   }
-  // Versiones anteriores de la hoja no tenían la columna Préstamo
-  if (mov.getRange(1, COL.prestamo).getValue() === '') {
-    mov.getRange(1, COL.prestamo).setValue('Préstamo').setFontWeight('bold').setBackground('#e8edf7');
+  // Versiones anteriores de la hoja no tenían las columnas Préstamo, Cuenta y Cuenta destino
+  [COL.prestamo, COL.cuenta, COL.destino].forEach(function (c) {
+    if (mov.getRange(1, c).getValue() === '') mov.getRange(1, c).setValue(ENCABEZADOS[c - 1]).setFontWeight('bold').setBackground('#e8edf7');
+  });
+  if (!ss.getSheetByName(HOJA_CTA)) {
+    const ct = ss.insertSheet(HOJA_CTA, 1);
+    ct.getRange(1, 1, 1, C_ENCABEZADOS.length).setValues([C_ENCABEZADOS]).setFontWeight('bold').setBackground('#e8edf7');
+    ct.getRange('C2:C').setDataValidation(SpreadsheetApp.newDataValidation().requireValueInList(TIPOS_CUENTA, true).build());
+    ct.getRange('F2:F').setNumberFormat('#,##0.00');
+    ct.setFrozenRows(1);
+    ct.setColumnWidths(1, 6, 140);
   }
   if (!ss.getSheetByName(HOJA_PRE)) {
     const pr = ss.insertSheet(HOJA_PRE);
@@ -196,10 +218,14 @@ function configurar_() {
     r.setColumnWidths(1, 5, 130);
   }
   if (!ss.getSheetByName(HOJA_CAT)) {
-    const g = ss.insertSheet(HOJA_CAT);
-    g.getRange('A1').setFormula('=IFERROR(QUERY(Movimientos!C:K,"select E, sum(K) where D = \'Gasto\' group by E pivot C label E \'Categoría\'",1),"Aún no hay gastos")');
-    g.setColumnWidth(1, 240);
+    ss.insertSheet(HOJA_CAT).setColumnWidth(1, 240);
   }
+  // Resúmenes sin transferencias entre cuentas ni ajustes de saldo (se reescriben al actualizar la versión)
+  const excl = ',Movimientos!E:E,"<>' + CAT_TRANSF + '",Movimientos!E:E,"<>' + CAT_AJUSTE + '"';
+  const res = ss.getSheetByName(HOJA_RES);
+  res.getRange('B2').setFormula('=ARRAYFORMULA(IF(A2:A="","",SUMIFS(Movimientos!K:K,Movimientos!C:C,A2:A,Movimientos!D:D,"Ingreso"' + excl + ')))');
+  res.getRange('C2').setFormula('=ARRAYFORMULA(IF(A2:A="","",SUMIFS(Movimientos!K:K,Movimientos!C:C,A2:A,Movimientos!D:D,"Gasto"' + excl + ')))');
+  ss.getSheetByName(HOJA_CAT).getRange('A1').setFormula('=IFERROR(QUERY(Movimientos!C:K,"select E, sum(K) where D = \'Gasto\' and E <> \'' + CAT_AJUSTE + '\' group by E pivot C label E \'Categoría\'",1),"Aún no hay gastos")');
 }
 
 function aFechaTexto_(v) {
@@ -234,13 +260,14 @@ function leerTodo_() {
         nota: String(r[COL.nota - 1] || ''), metodo: String(r[COL.metodo - 1] || ''),
         moneda: moneda, monto: monto, tc: tc, montoPEN: Math.round(monto * tc * 100) / 100,
         creado: r[COL.creado - 1] instanceof Date ? r[COL.creado - 1].toISOString() : String(r[COL.creado - 1] || ''),
-        prestamoId: String(r[COL.prestamo - 1] || '')
+        prestamoId: String(r[COL.prestamo - 1] || ''),
+        cuenta: String(r[COL.cuenta - 1] || ''), destino: String(r[COL.destino - 1] || '')
       });
     });
     // Filas escritas a mano reciben un ID para poder borrarlas desde el formulario
     idsNuevos.forEach(function (x) { sh.getRange(x[0], COL.id).setValue(x[1]); });
   }
-  return { movimientos: movimientos, prestamos: leerPrestamos_(), config: leerConfig_(), hoja: { url: ss.getUrl(), id: ss.getId(), nombre: ss.getName() } };
+  return { movimientos: movimientos, cuentas: leerCuentas_(), prestamos: leerPrestamos_(), config: leerConfig_(), hoja: { url: ss.getUrl(), id: ss.getId(), nombre: ss.getName() } };
 }
 
 /** Última fila con datos reales (getLastRow no sirve: las ARRAYFORMULA llenan toda la columna). */
@@ -316,8 +343,9 @@ function escribirMov_(sh, r, m, nuevo) {
   // C (Mes) y K (Monto S/) las calculan las fórmulas de la fila 1
   sh.getRange(r, COL.id, 1, 2).setValues([[id, new Date(p[0], p[1] - 1, p[2])]]);
   sh.getRange(r, COL.tipo, 1, 7).setValues([[m.tipo === 'Ingreso' ? 'Ingreso' : 'Gasto', String(m.categoria || ''), String(m.nota || ''), String(m.metodo || ''), moneda, monto, tc]]);
-  if (nuevo) sh.getRange(r, COL.creado, 1, 2).setValues([[new Date(), String(m.prestamoId || '')]]);
-  else sh.getRange(r, COL.prestamo).setValue(String(m.prestamoId || ''));
+  const cuenta = String(m.cuenta || ''), destino = m.categoria === CAT_TRANSF ? String(m.destino || '') : '';
+  if (nuevo) sh.getRange(r, COL.creado, 1, 4).setValues([[new Date(), String(m.prestamoId || ''), cuenta, destino]]);
+  else sh.getRange(r, COL.prestamo, 1, 3).setValues([[String(m.prestamoId || ''), cuenta, destino]]);
 }
 
 function borrar_(id) {
@@ -399,4 +427,57 @@ function borrarPrestamo_(id) {
   for (let i = ids.length - 1; i >= 0; i--) {
     if (String(ids[i][0]) === String(id)) { sh.deleteRow(i + 2); return; }
   }
+}
+
+/* ---------- Cuentas ---------- */
+
+function leerCuentas_() {
+  const sh = ss_().getSheetByName(HOJA_CTA);
+  const n = ultimaFila_(sh, [CCOL.id, CCOL.nombre]) - 1;
+  if (n < 1) return [];
+  const out = [];
+  sh.getRange(2, 1, n, C_ENCABEZADOS.length).getValues().forEach(function (r, i) {
+    if (!r[CCOL.nombre - 1]) return;
+    let id = String(r[CCOL.id - 1] || '');
+    if (!id) { id = 'c' + Utilities.getUuid().slice(0, 8); sh.getRange(i + 2, CCOL.id).setValue(id); }
+    out.push({
+      id: id, nombre: String(r[CCOL.nombre - 1]), tipo: String(r[CCOL.tipo - 1] || 'Otro'),
+      archivada: r[CCOL.archivada - 1] === true || String(r[CCOL.archivada - 1]).toLowerCase() === 'sí',
+      creado: r[CCOL.creado - 1] instanceof Date ? r[CCOL.creado - 1].toISOString() : String(r[CCOL.creado - 1] || '')
+    });
+  });
+  return out;
+}
+
+function formulaSaldo_(r) {
+  // ingresos - gastos de la cuenta, - lo que salió hacia otra cuenta, + lo que llegó desde otra cuenta
+  const k = 'Movimientos!K:K', n = 'Movimientos!N:N', a = '$A' + r;
+  return '=SUMIFS(' + k + ',' + n + ',' + a + ',Movimientos!D:D,"Ingreso",Movimientos!E:E,"<>' + CAT_TRANSF + '")' +
+    '-SUMIFS(' + k + ',' + n + ',' + a + ',Movimientos!D:D,"Gasto")' +
+    '-SUMIFS(' + k + ',' + n + ',' + a + ',Movimientos!E:E,"' + CAT_TRANSF + '")' +
+    '+SUMIFS(' + k + ',Movimientos!O:O,' + a + ')';
+}
+
+function agregarCuenta_(c) {
+  if (!c || !String(c.nombre || '').trim()) throw new Error('Falta el nombre de la cuenta');
+  const sh = ss_().getSheetByName(HOJA_CTA);
+  const r = ultimaFila_(sh, [CCOL.id, CCOL.nombre]) + 1;
+  const tipo = TIPOS_CUENTA.indexOf(c.tipo) >= 0 ? c.tipo : 'Otro';
+  sh.getRange(r, 1, 1, 6).setValues([[String(c.id || ('c' + Utilities.getUuid().slice(0, 8))), String(c.nombre).trim(), tipo, c.archivada ? 'Sí' : 'No', new Date(), formulaSaldo_(r)]]);
+}
+
+function editarCuenta_(c) {
+  if (!c || !c.id) throw new Error('Falta la cuenta');
+  const sh = ss_().getSheetByName(HOJA_CTA);
+  const f = filasPorId_(sh, [CCOL.id, CCOL.nombre])[String(c.id)];
+  if (!f) return agregarCuenta_(c);
+  const tipo = TIPOS_CUENTA.indexOf(c.tipo) >= 0 ? c.tipo : 'Otro';
+  sh.getRange(f, CCOL.nombre, 1, 3).setValues([[String(c.nombre || '').trim(), tipo, c.archivada ? 'Sí' : 'No']]);
+}
+
+function borrarCuenta_(id) {
+  if (!id) throw new Error('Falta el ID');
+  const sh = ss_().getSheetByName(HOJA_CTA);
+  const f = filasPorId_(sh, [CCOL.id, CCOL.nombre])[String(id)];
+  if (f) sh.deleteRow(f);
 }

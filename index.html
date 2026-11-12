@@ -206,6 +206,28 @@ form{display:flex;flex-direction:column;gap:14px}
 .hero form button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
 @media (min-width:720px){.hero{flex-direction:row;align-items:center;justify-content:space-between;padding:22px 24px}.hero-side{flex-direction:column;align-items:flex-end;text-align:right}.hero form{min-width:320px}}
 
+/* ---------- cuentas ---------- */
+.accstrip{display:flex;gap:10px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+.accstrip::-webkit-scrollbar{display:none}
+.accchip{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:140px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-s);padding:10px 12px;box-shadow:var(--shadow);font-weight:400;white-space:nowrap}
+.accchip:hover{border-color:var(--accent)}
+.accchip .n{font-size:12px;color:var(--muted);font-weight:600}
+.accchip .s{font-family:var(--f-num);font-weight:600;font-size:15px}
+.accgrid{display:grid;grid-template-columns:1fr;gap:12px}
+@media (min-width:560px){.accgrid{grid-template-columns:1fr 1fr}}
+.acc{border:1px solid var(--line);border-radius:var(--radius-s);padding:14px;display:flex;flex-direction:column;gap:10px;background:var(--surface);min-width:0}
+.acc.sincuenta{border-style:dashed;background:var(--surface-2)}
+.acchead{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.acchead strong{font-size:16px;overflow-wrap:anywhere}
+.accsaldo{font-family:var(--f-num);font-variant-numeric:tabular-nums;font-weight:600;font-size:24px;white-space:nowrap}
+.accmes{display:flex;gap:4px 10px;font-size:13px;color:var(--muted);flex-wrap:wrap}
+.accmes b{font-family:var(--f-num);white-space:nowrap}
+.accacts{display:flex;gap:6px;flex-wrap:wrap}
+.accacts button{flex:1 1 auto}
+.accacts button:first-child{flex-basis:100%}
+.accform{display:flex;flex-direction:column;gap:10px;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--radius-s);padding:12px}
+.notice{font-size:14px;background:var(--warn-bg);color:var(--warn);border-radius:var(--radius-s);padding:10px 14px}
+
 /* ---------- guardado en segundo plano ---------- */
 .sync{position:fixed;right:14px;bottom:14px;z-index:20;display:flex;align-items:center;gap:8px;background:var(--ink);color:#fff;font-size:13px;font-weight:600;padding:9px 14px;border-radius:999px;box-shadow:0 6px 20px rgba(20,33,61,.25)}
 .sync.ok{background:var(--good)}
@@ -235,7 +257,7 @@ form{display:flex;flex-direction:column;gap:14px}
 .morefilters .q{grid-column:1/-1}
 .ftoggle{align-self:flex-start}
 @media (max-width:719px){.morefilters:not(.open){display:none}}
-@media (min-width:720px){.ftoggle{display:none!important}.morefilters{grid-template-columns:190px 1fr 1fr 1.4fr}.morefilters .q{grid-column:auto}.daynav{max-width:360px}.range{max-width:420px}}
+@media (min-width:720px){.ftoggle{display:none!important}.morefilters{grid-template-columns:190px 1fr 1fr 1fr 1.3fr}.morefilters .q{grid-column:auto}.daynav{max-width:360px}.range{max-width:420px}}
 .fsum{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;color:var(--muted);background:var(--surface-2);border:1px solid var(--line);border-radius:var(--radius-s);padding:8px 12px;margin-bottom:6px}
 .fsum b{font-family:var(--f-num);white-space:nowrap}
 
@@ -294,6 +316,7 @@ form{display:flex;flex-direction:column;gap:14px}
       <button type="button" role="tab" id="tab-resumen" aria-controls="panel-resumen" data-tab="resumen">Resumen</button>
       <button type="button" role="tab" id="tab-registrar" aria-controls="panel-registrar" data-tab="registrar">Registrar</button>
       <button type="button" role="tab" id="tab-movimientos" aria-controls="panel-movimientos" data-tab="movimientos">Movimientos</button>
+      <button type="button" role="tab" id="tab-cuentas" aria-controls="panel-cuentas" data-tab="cuentas">Cuentas</button>
       <button type="button" role="tab" id="tab-prestamos" aria-controls="panel-prestamos" data-tab="prestamos">Préstamos <span class="count" id="loanCount" hidden></span></button>
       <button type="button" role="tab" id="tab-presupuesto" aria-controls="panel-presupuesto" data-tab="presupuesto">Presupuesto</button>
     </nav>
@@ -302,7 +325,7 @@ form{display:flex;flex-direction:column;gap:14px}
     <section class="panel" role="tabpanel" id="panel-resumen" aria-labelledby="tab-resumen">
       <section class="card hero" aria-labelledby="dispTitle">
         <div>
-          <div class="k" id="dispTitle">Te queda en la cuenta</div>
+          <div class="k" id="dispTitle">Te queda en total</div>
           <div class="hero-v" id="tDisp">S/ 0.00</div>
           <div class="h" id="tDispH">Según tus movimientos hasta hoy</div>
         </div>
@@ -319,6 +342,7 @@ form{display:flex;flex-direction:column;gap:14px}
           <div class="msg" id="ajMsg" role="status" aria-live="polite"></div>
         </form>
       </section>
+      <div class="accstrip" id="accStrip" aria-label="Saldo por cuenta" hidden></div>
       <div class="tiles" aria-label="Resumen del mes">
         <div class="tile"><div class="k">Ingresos</div><div class="v pos" id="tIng">S/ 0.00</div><div class="h" id="tIngN">0 movimientos</div></div>
         <div class="tile"><div class="k">Gastos</div><div class="v neg" id="tGas">S/ 0.00</div><div class="h" id="tGasN">0 movimientos</div></div>
@@ -361,7 +385,12 @@ form{display:flex;flex-direction:column;gap:14px}
             <label for="monto">Monto<input type="number" id="monto" class="num" step="0.01" min="0.01" inputmode="decimal" placeholder="0.00" required></label>
             <label for="tc" id="tcWrap">Tipo de cambio<input type="number" id="tc" class="num" step="0.001" min="0.001" inputmode="decimal"></label>
           </div>
+          <label for="cuentaSel" id="cuentaWrap" hidden>Cuenta<select id="cuentaSel"></select></label>
           <label for="categoria" id="catWrap">Categoría<select id="categoria"></select></label>
+          <div class="row2" id="transfSelWrap" hidden>
+            <label for="tDesdeSel">De mi cuenta<select id="tDesdeSel"></select></label>
+            <label for="tHaciaSel">A mi cuenta<select id="tHaciaSel"></select></label>
+          </div>
           <div class="row2" id="transfWrap" hidden>
             <label for="tDesde">De mi cuenta<input type="text" id="tDesde" list="cuentas" maxlength="40" placeholder="Ej. Prexpe"></label>
             <label for="tHacia">A mi cuenta<input type="text" id="tHacia" list="cuentas" maxlength="40" placeholder="Ej. Yape"></label>
@@ -416,6 +445,7 @@ form{display:flex;flex-direction:column;gap:14px}
           <div class="morefilters" id="moreFilters">
             <select id="fTipo" aria-label="Tipo"><option value="">Todos los tipos</option><option value="Gasto">Solo gastos</option><option value="Ingreso">Solo ingresos</option><option value="Entre mis cuentas">Solo entre mis cuentas</option></select>
             <select id="fCat" aria-label="Categoría"></select>
+            <select id="fCuenta" aria-label="Cuenta"></select>
             <select id="fMetodo" aria-label="Medio de pago"></select>
             <input type="search" id="fQ" class="q" placeholder="Buscar en la descripción…" aria-label="Buscar">
           </div>
@@ -428,6 +458,34 @@ form{display:flex;flex-direction:column;gap:14px}
         <ul class="txlist" id="tbody"></ul>
         <div class="empty" id="empty"></div>
       </section>
+    </section>
+
+    <!-- CUENTAS -->
+    <section class="panel" role="tabpanel" id="panel-cuentas" aria-labelledby="tab-cuentas" hidden>
+      <p class="notice" id="ctaAviso" hidden>Para usar cuentas, actualiza el Apps Script de tu hoja con el Code.gs versión 3 y publica una Nueva versión.</p>
+      <div class="cols wide-left">
+        <section class="card" aria-labelledby="ctaTitle">
+          <div class="cardhead"><h2 id="ctaTitle">Mis cuentas</h2><span class="tag" id="ctaTotal"></span></div>
+          <div class="accgrid" id="accGrid"></div>
+          <details id="ctaArch" style="margin-top:14px" hidden><summary class="tag" style="cursor:pointer">Cuentas archivadas</summary><div class="accgrid" id="accArch" style="margin-top:10px"></div></details>
+        </section>
+        <section class="card" aria-labelledby="ctaNewTitle">
+          <h2 id="ctaNewTitle">Nueva cuenta</h2>
+          <form id="formCuenta" novalidate>
+            <label for="cNombre">Nombre<input type="text" id="cNombre" list="cuentasSug" maxlength="40" placeholder="Ej. Yape, BCP, Efectivo" required></label>
+            <datalist id="cuentasSug"><option>Yape</option><option>Plin</option><option>Efectivo</option><option>Prexpe</option><option>BCP</option><option>Interbank</option><option>BBVA</option><option>Scotiabank</option></datalist>
+            <div class="row2">
+              <label for="cTipo">Tipo
+                <select id="cTipo"><option>Billetera digital</option><option>Banco</option><option>Efectivo</option><option>Tarjeta de crédito</option><option>App de préstamos</option><option>Otro</option></select>
+              </label>
+              <label for="cSaldo">Saldo actual S/<input type="number" id="cSaldo" class="num" step="0.01" inputmode="decimal" placeholder="0.00"></label>
+            </div>
+            <span class="hint">El saldo actual se registra como "Ajuste de saldo": no cuenta como ingreso ni gasto del mes.</span>
+            <button class="primary" type="submit" id="btnCuenta">Crear cuenta</button>
+            <div class="msg" id="cuMsg" role="status" aria-live="polite"></div>
+          </form>
+        </section>
+      </div>
     </section>
 
     <!-- PRÉSTAMOS -->
@@ -457,6 +515,7 @@ form{display:flex;flex-direction:column;gap:14px}
               <label for="pPrimer">Primer vencimiento<input type="date" id="pPrimer" required></label>
             </div>
             <label for="pNota">Descripción <span class="hint">(opcional)</span><input type="text" id="pNota" maxlength="140" placeholder="Ej. Crédito para la importación"></label>
+            <label for="pCuenta" id="pCuentaWrap" hidden>¿A qué cuenta llegó la plata?<select id="pCuenta"></select></label>
             <label class="check" for="pIngreso"><input type="checkbox" id="pIngreso" checked><span>Registrar lo recibido como ingreso<span class="hint" style="display:block">En la categoría "Préstamo recibido"</span></span></label>
             <div class="calc" id="pCalc">Completa monto, cuotas y cuota para ver cuánto pagarás en total.</div>
             <button class="primary" type="submit" id="btnPrestamo">Guardar préstamo</button>
@@ -514,6 +573,8 @@ form{display:flex;flex-direction:column;gap:14px}
   let conn=null;            // {url, clave}
   let movs=[];
   let prestamos=[];
+  let cuentas=[];
+  const KEY_ULT_CTA="finanzas.ultimaCuenta";
   let cfg={tc:3.75, presupuestos:{}};
   let pendingDel=null;
 
@@ -539,6 +600,8 @@ form{display:flex;flex-direction:column;gap:14px}
 
   function aplicar(data){
     servidorV2 = Number(data.version)>=2;
+    servidorV3 = Number(data.version)>=3;
+    cuentas = Array.isArray(data.cuentas) ? data.cuentas : [];
     movs = Array.isArray(data.movimientos) ? data.movimientos : [];
     prestamos = Array.isArray(data.prestamos) ? data.prestamos : [];
     if(data.config) cfg = {tc:Number(data.config.tc)||cfg.tc, presupuestos:Object.assign({},data.config.presupuestos||{})};
@@ -559,7 +622,7 @@ form{display:flex;flex-direction:column;gap:14px}
   // ---------- guardado en segundo plano ----------
   // La página se actualiza al instante; los cambios se envían a la hoja en orden, uno tras otro.
   // Al terminar la cola se toma la respuesta de la hoja como la versión real.
-  const cola=[]; let procesando=false, ultimaRespuesta=null, syncTimer=null, servidorV2=false;
+  const cola=[]; let procesando=false, ultimaRespuesta=null, syncTimer=null, servidorV2=false, servidorV3=false;
   // Con el Apps Script v1 (sin lote/editar/reordenar) cada paso se traduce a acciones antiguas.
   function pasosV1(p){
     if(p.accion==="editar") return [{accion:"borrar",id:p.mov.id},{accion:"agregar",mov:p.mov}];
@@ -651,10 +714,17 @@ form{display:flex;flex-direction:column;gap:14px}
   $("tcDefault").value = cfg.tc;
   $("tc").value = cfg.tc;
 
+  function camposSegunTipo(){
+    const t = tipoSel()==="Transferencia", n = cuentasActivas().length;
+    $("catWrap").hidden=t; $("metodoWrap").hidden=t; $("transfNote").hidden=!t;
+    $("cuentaWrap").hidden = t || !n;
+    $("transfSelWrap").hidden = !t || n<2;
+    $("transfWrap").hidden = !t || n>=2;
+  }
   function fillCategorias(){
     const tipo = tipoSel();
     const t = tipo==="Transferencia";
-    $("catWrap").hidden=t; $("metodoWrap").hidden=t; $("transfWrap").hidden=!t; $("transfNote").hidden=!t;
+    camposSegunTipo();
     if(!t) $("categoria").innerHTML = (tipo==="Gasto"?CAT_GASTO:CAT_ING).map(c=>`<option>${esc(c)}</option>`).join("");
   }
   function toggleTc(){ $("tcWrap").style.visibility = $("moneda").value==="USD" ? "visible" : "hidden"; }
@@ -672,7 +742,10 @@ form{display:flex;flex-direction:column;gap:14px}
     e.preventDefault();
     const tipoForm=tipoSel(), transf=tipoForm==="Transferencia";
     const tipo = transf ? "Ingreso" : tipoForm;
-    const desde=$("tDesde").value.trim(), hacia=$("tHacia").value.trim();
+    const conSel = !$("transfSelWrap").hidden;
+    const desdeId = transf&&conSel ? $("tDesdeSel").value : "", haciaId = transf&&conSel ? $("tHaciaSel").value : "";
+    const desde = conSel ? nombreCuenta(desdeId) : $("tDesde").value.trim(), hacia = conSel ? nombreCuenta(haciaId) : $("tHacia").value.trim();
+    if(transf && conSel && desdeId===haciaId){ showMsg("Las cuentas de origen y destino deben ser distintas.",true); $("tHaciaSel").focus(); return; }
     if(transf && (!desde||!hacia)){ showMsg("Escribe de cuál de tus cuentas sale la plata y a cuál llega.",true); (desde?$("tHacia"):$("tDesde")).focus(); return; }
     if(transf && desde.toLowerCase()===hacia.toLowerCase()){ showMsg("Las cuentas de origen y destino deben ser distintas.",true); $("tHacia").focus(); return; }
     const fecha=$("fecha").value, moneda=$("moneda").value;
@@ -685,7 +758,10 @@ form{display:flex;flex-direction:column;gap:14px}
     const mov={id: orig ? orig.id : "m"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),tipo,fecha,mes:fecha.slice(0,7),monto,moneda,tc,
       montoPEN:round2(monto*tc),categoria:transf?CAT_TRANSF:$("categoria").value,metodo:transf?desde+" → "+hacia:$("metodo").value,nota:$("nota").value.trim(),
       creado: orig && orig.creado ? orig.creado : new Date().toISOString(),
-      prestamoId: transf ? "" : orig && String(orig.prestamoId||"").startsWith("r:") ? orig.prestamoId : ($("prestamoWrap").hidden ? "" : $("prestamoSel").value)};
+      prestamoId: transf ? "" : orig && String(orig.prestamoId||"").startsWith("r:") ? orig.prestamoId : ($("prestamoWrap").hidden ? "" : $("prestamoSel").value),
+      cuenta: transf ? desdeId : ($("cuentaWrap").hidden ? (orig?orig.cuenta||"":"") : $("cuentaSel").value),
+      destino: transf ? haciaId : ""};
+    if(!transf && mov.cuenta) guardarUltimaCuenta(mov.cuenta);
     const etiqueta = transf ? `Movimiento entre tus cuentas de ${fmtCur(monto,moneda)} (${desde} → ${hacia})` : `${tipo} de ${fmtCur(monto,moneda)}`;
     // Se muestra al instante y se guarda en segundo plano.
     // Editar = borrar la fila original y escribirla de nuevo con el mismo ID (así no hace falta cambiar el Apps Script)
@@ -703,8 +779,11 @@ form{display:flex;flex-direction:column;gap:14px}
   function empezarEdicion(m){
     editando=m;
     $(esTransf(m)?"tipoT":m.tipo==="Ingreso"?"tipoI":"tipoG").checked=true; fillCategorias();
-    if(esTransf(m)){ const [a,b]=String(m.metodo||"").split("→").map(t=>t.trim()); $("tDesde").value=a||""; $("tHacia").value=b||""; }
-    else ensureOption($("categoria"),m.categoria);
+    if(esTransf(m)){
+      const [a,b]=String(m.metodo||"").split("→").map(t=>t.trim()); $("tDesde").value=a||""; $("tHacia").value=b||"";
+      if(m.cuenta) selCuenta($("tDesdeSel"),m.cuenta); if(m.destino) selCuenta($("tHaciaSel"),m.destino);
+    }
+    else { ensureOption($("categoria"),m.categoria); selCuenta($("cuentaSel"),m.cuenta||""); }
     togglePrestamo();
     $("fecha").value=m.fecha; $("moneda").value=m.moneda; toggleTc();
     $("monto").value=Number(m.monto).toFixed(2); $("tc").value=m.moneda==="USD"?m.tc:cfg.tc;
@@ -716,7 +795,7 @@ form{display:flex;flex-direction:column;gap:14px}
     showTab("registrar"); window.scrollTo(0,0); $("fecha").focus();
   }
   function terminarEdicion(){
-    editando=null; $("fTitle").textContent="Nuevo movimiento"; $("editNote").hidden=true; $("tDesde").value=""; $("tHacia").value="";
+    editando=null; $("fTitle").textContent="Nuevo movimiento"; $("editNote").hidden=true; $("tDesde").value=""; $("tHacia").value=""; selCuenta($("cuentaSel"),ultimaCuenta());
     $("btnSave").textContent="Guardar en la hoja"; $("btnCancelEdit").hidden=true;
     $("fecha").value=today(); $("monto").value=""; $("nota").value=""; $("prestamoSel").value="";
   }
@@ -790,6 +869,7 @@ form{display:flex;flex-direction:column;gap:14px}
   // ---------- render ----------
   function render(){
     renderPrestamos();
+    renderCuentas();
     const list = movs.filter(x=>x.mes===$("mes").value && x.categoria!==CAT_AJUSTE);
     renderSaldo();
     let ing=0, gas=0, nI=0, nG=0; const porCat={};
@@ -841,11 +921,15 @@ form{display:flex;flex-direction:column;gap:14px}
     $("tDispH").textContent = ajustes.length
       ? "Último ajuste el "+ajustes[0].fecha.split("-").reverse().join("/")+(futuros?" · no incluye "+futuros+" movimiento(s) con fecha futura":"")
       : (movs.length ? "¿No cuadra con tu cuenta? Pulsa Ajustar saldo y pon tu saldo real." : "Registra tus movimientos o pon tu saldo actual con Ajustar saldo.");
+    $("btnAjustar").textContent = cuentasActivas().length ? "Ver mis cuentas" : "Ajustar saldo";
+    if(cuentasActivas().length) $("tDispH").textContent = "Suma de tus "+cuentasActivas().length+(cuentasActivas().length===1?" cuenta":" cuentas")+(movs.some(x=>!x.cuenta&&!esTransf(x))?" y movimientos sin cuenta":"")+(futuros?" · no incluye "+futuros+" con fecha futura":"");
+    renderStrip();
     const deuda=prestamos.reduce((a,p)=>a+estadoPrestamo(p).saldo,0);
     $("tDispNeto").innerHTML = deuda>0 ? `Después de pagar tus préstamos: <b>${disp-deuda<0?"−":""}${fmtPEN(Math.abs(round2(disp-deuda)))}</b>` : "";
     return disp;
   }
   $("btnAjustar").addEventListener("click",()=>{
+    if(cuentasActivas().length){ showTab("cuentas"); window.scrollTo(0,0); return; }
     $("formAjuste").hidden=false; $("heroSide").hidden=true; $("ajMsg").textContent="";
     $("ajReal").value=""; $("ajReal").focus();
   });
@@ -865,8 +949,177 @@ form{display:flex;flex-direction:column;gap:14px}
     encolar("el ajuste de saldo",[{accion:"agregar",mov}]);
   });
 
+  // ---------- cuentas ----------
+  function cuentaPorId(id){ return cuentas.find(c=>c.id===id); }
+  function cuentasActivas(){ return cuentas.filter(c=>!c.archivada); }
+  function nombreCuenta(id){ if(!id) return ""; const c=cuentaPorId(id); return c?c.nombre:"Cuenta eliminada"; }
+  function ultimaCuenta(){ let u=""; try{ u=localStorage.getItem(KEY_ULT_CTA)||""; }catch(e){} const a=cuentasActivas(); return a.some(c=>c.id===u)?u:(a[0]?a[0].id:""); }
+  function guardarUltimaCuenta(id){ try{ localStorage.setItem(KEY_ULT_CTA,id); }catch(e){} }
+  function selCuenta(sel,id){ if(id && ![...sel.options].some(o=>o.value===id)){ const o=document.createElement("option"); o.value=id; o.textContent=nombreCuenta(id); sel.appendChild(o); } sel.value=id; }
+  // efecto de un movimiento en el saldo de una cuenta
+  function efecto(x,cid){
+    if(esTransf(x)) return x.cuenta===cid&&cid ? -x.montoPEN : (x.destino===cid&&cid ? x.montoPEN : 0);
+    if((x.cuenta||"")!==cid) return 0;
+    return x.tipo==="Ingreso" ? x.montoPEN : -x.montoPEN;
+  }
+  function saldoCuenta(cid){ const hoy=today(); return round2(movs.filter(x=>x.fecha<=hoy).reduce((a,x)=>a+efecto(x,cid),0)); }
+  function mesCuenta(cid){
+    const m=$("mes").value; let ing=0,gas=0;
+    movs.forEach(x=>{ if(x.mes!==m||esTransf(x)||x.categoria===CAT_AJUSTE||(x.cuenta||"")!==cid) return; if(x.tipo==="Ingreso") ing+=x.montoPEN; else gas+=x.montoPEN; });
+    return {ing:round2(ing),gas:round2(gas)};
+  }
+  const sinCuentaMovs = () => movs.filter(x=>!x.cuenta && !esTransf(x));
+  const signo = v => (v<0?"−":"")+fmtPEN(Math.abs(v));
+
+  function opcionesCuentas(sel, actual, extra){
+    const act=cuentasActivas();
+    sel.innerHTML = act.map(c=>`<option value="${esc(c.id)}">${esc(c.nombre)}</option>`).join("") + (extra||"");
+    if(actual!==undefined) selCuenta(sel, actual);
+  }
+  function renderCuentasSelects(){
+    const u=ultimaCuenta();
+    const activa=id=>cuentasActivas().some(c=>c.id===id)?id:"";
+    const prev={c:editando?$("cuentaSel").value:activa($("cuentaSel").value),d:activa($("tDesdeSel").value),h:activa($("tHaciaSel").value),p:activa($("pCuenta").value)};
+    opcionesCuentas($("cuentaSel"), prev.c||u, '<option value="">Sin cuenta</option>');
+    opcionesCuentas($("tDesdeSel"), prev.d||u);
+    const otra=(cuentasActivas().find(c=>c.id!==$("tDesdeSel").value)||{}).id||"";
+    opcionesCuentas($("tHaciaSel"), prev.h && prev.h!==$("tDesdeSel").value ? prev.h : otra);
+    opcionesCuentas($("pCuenta"), prev.p||u);
+    $("pCuentaWrap").hidden = !cuentasActivas().length || !$("pIngreso").checked;
+    camposSegunTipo();
+  }
+  $("pIngreso").addEventListener("change",()=>{ $("pCuentaWrap").hidden = !cuentasActivas().length || !$("pIngreso").checked; });
+
+  function renderStrip(){
+    const act=cuentasActivas(), el=$("accStrip");
+    el.hidden=!act.length; if(!act.length){ el.innerHTML=""; return; }
+    const sin=sinCuentaMovs();
+    el.innerHTML = act.map(c=>{ const v=saldoCuenta(c.id); return `<button type="button" class="accchip" data-vercuenta="${esc(c.id)}"><span class="n">${esc(c.nombre)}</span><span class="s ${v<0?"neg":""}">${signo(v)}</span></button>`; }).join("")
+      + (sin.length?`<button type="button" class="accchip" data-goto="cuentas"><span class="n">Sin cuenta</span><span class="s">${signo(saldoCuenta(""))}</span></button>`:"");
+  }
+
+  let ctaAccion=null; // {id, tipo:"ajustar"|"editar"}
+  function tarjetaCuenta(c){
+    const v=saldoCuenta(c.id), mc=mesCuenta(c.id), usados=movs.some(x=>x.cuenta===c.id||x.destino===c.id);
+    const del=pendingDel==="cta:"+c.id;
+    let form="";
+    if(ctaAccion&&ctaAccion.id===c.id&&ctaAccion.tipo==="ajustar") form=`<form class="accform" data-ajform="${esc(c.id)}" novalidate>
+        <label for="aj-${esc(c.id)}">¿Cuánto tienes de verdad hoy en ${esc(c.nombre)}? (S/)<input type="number" id="aj-${esc(c.id)}" class="num" step="0.01" inputmode="decimal" value="${v.toFixed(2)}"></label>
+        <div class="foot"><button type="submit" class="primary small">Guardar saldo</button><button type="button" class="small" data-ctacancel>Cancelar</button></div></form>`;
+    if(ctaAccion&&ctaAccion.id===c.id&&ctaAccion.tipo==="editar") form=`<form class="accform" data-edform="${esc(c.id)}" novalidate>
+        <label for="en-${esc(c.id)}">Nombre<input type="text" id="en-${esc(c.id)}" maxlength="40" value="${esc(c.nombre)}"></label>
+        <label for="et-${esc(c.id)}">Tipo<select id="et-${esc(c.id)}">${["Billetera digital","Banco","Efectivo","Tarjeta de crédito","App de préstamos","Otro"].map(t=>`<option${t===c.tipo?" selected":""}>${t}</option>`).join("")}</select></label>
+        <div class="foot"><button type="submit" class="primary small">Guardar</button><button type="button" class="small" data-ctacancel>Cancelar</button></div></form>`;
+    return `<div class="acc">
+      <div class="acchead"><div><strong>${esc(c.nombre)}</strong><div class="tag">${esc(c.tipo)}${c.archivada?" · archivada":""}</div></div></div>
+      <div class="accsaldo ${v<0?"neg":""}">${signo(v)}</div>
+      <div class="accmes"><span>Este mes:</span><b class="pos">+${fmtPEN(mc.ing)}</b><b class="neg">−${fmtPEN(mc.gas)}</b></div>
+      ${form}
+      <div class="accacts">
+        ${c.archivada?`<button type="button" class="small" data-restaurar="${esc(c.id)}">Restaurar</button>`:
+          `<button type="button" class="small" data-vercuenta="${esc(c.id)}">Ver movimientos</button>
+           <button type="button" class="small" data-ajustar="${esc(c.id)}">Ajustar saldo</button>
+           <button type="button" class="small" data-editarcta="${esc(c.id)}">Editar</button>`}
+        ${usados ? (c.archivada?"":`<button type="button" class="small" data-archivar="${esc(c.id)}" title="Tiene movimientos: se oculta pero se conserva">Archivar</button>`)
+                 : `<button type="button" class="small del${del?" confirm":""}" data-borrarcta="${esc(c.id)}">${del?"¿Eliminar?":"Eliminar"}</button>`}
+      </div></div>`;
+  }
+  function renderCuentas(){
+    $("ctaAviso").hidden = servidorV3 || !conn;
+    $("formCuenta").querySelectorAll("input,select,button").forEach(el=>el.disabled=!servidorV3);
+    const act=cuentasActivas(), arch=cuentas.filter(c=>c.archivada);
+    const sin=sinCuentaMovs();
+    let html=act.map(tarjetaCuenta).join("");
+    if(sin.length){
+      const v=saldoCuenta("");
+      html+=`<div class="acc sincuenta">
+        <div class="acchead"><div><strong>Sin cuenta</strong><div class="tag">${sin.length} ${sin.length===1?"movimiento":"movimientos"} registrados antes de usar cuentas</div></div></div>
+        <div class="accsaldo ${v<0?"neg":""}">${signo(v)}</div>
+        ${act.length&&servidorV3?`<form class="accform" id="formAsignar" novalidate>
+          <label for="asigCta">Pasar todos a la cuenta<select id="asigCta">${act.map(c=>`<option value="${esc(c.id)}">${esc(c.nombre)}</option>`).join("")}</select></label>
+          <button type="submit" class="primary small">Asignar ${sin.length} ${sin.length===1?"movimiento":"movimientos"}</button>
+          <span class="hint">También puedes asignarlos uno por uno con Editar en Movimientos.</span></form>`:'<span class="hint">Crea una cuenta para asignarle estos movimientos.</span>'}
+        <div class="accacts"><button type="button" class="small" data-vercuenta="__sin">Ver movimientos</button></div></div>`;
+    }
+    $("accGrid").innerHTML = html || '<div class="empty">Aún no tienes cuentas. Crea la primera con el formulario: por ejemplo Yape, BCP o Efectivo.</div>';
+    $("ctaArch").hidden=!arch.length; $("accArch").innerHTML=arch.map(tarjetaCuenta).join("");
+    const tot=round2(act.reduce((a,c)=>a+saldoCuenta(c.id),0)+(sin.length?saldoCuenta(""):0));
+    $("ctaTotal").textContent = act.length ? "Total: "+signo(tot) : "";
+    renderCuentasSelects();
+  }
+
+  function movAjuste(cid, dif, real, nota){
+    return {id:nuevoId("m"),tipo:dif>0?"Ingreso":"Gasto",fecha:today(),mes:today().slice(0,7),monto:Math.abs(dif),moneda:"PEN",tc:1,montoPEN:Math.abs(dif),
+      categoria:CAT_AJUSTE,metodo:"Otro",nota:nota||("Saldo real informado: "+fmtPEN(real)),creado:new Date().toISOString(),prestamoId:"",cuenta:cid,destino:""};
+  }
+
+  $("formCuenta").addEventListener("submit",e=>{
+    e.preventDefault();
+    const cm=$("cuMsg"), nombre=$("cNombre").value.trim(), saldo=$("cSaldo").value.trim()===""?0:round2($("cSaldo").value);
+    if(!nombre){ cm.textContent="Escribe el nombre de la cuenta."; cm.className="msg err"; $("cNombre").focus(); return; }
+    if(cuentas.some(c=>c.nombre.toLowerCase()===nombre.toLowerCase())){ cm.textContent="Ya tienes una cuenta con ese nombre."; cm.className="msg err"; return; }
+    if(isNaN(saldo)){ cm.textContent="El saldo no es un número válido."; cm.className="msg err"; return; }
+    const cuenta={id:nuevoId("c"),nombre,tipo:$("cTipo").value,archivada:false,creado:new Date().toISOString()};
+    const pasos=[{accion:"cuenta_agregar",cuenta}];
+    cuentas=cuentas.concat([cuenta]);
+    if(Math.abs(saldo)>=0.01){ const mov=movAjuste(cuenta.id,saldo,saldo,"Saldo inicial de la cuenta "+nombre); movs=movs.concat([mov]); pasos.push({accion:"agregar",mov}); }
+    if(cuentasActivas().length===1) guardarUltimaCuenta(cuenta.id);
+    render();
+    cm.textContent=`Cuenta ${nombre} creada`+(Math.abs(saldo)>=0.01?` con ${signo(saldo)}.`:"."); cm.className="msg";
+    $("cNombre").value=""; $("cSaldo").value="";
+    encolar("la cuenta "+nombre,pasos);
+  });
+
+  document.getElementById("panel-cuentas").addEventListener("click",e=>{
+    const t=e.target;
+    const g=(attr)=>{ const el=t.closest("["+attr+"]"); return el?el.getAttribute(attr):null; };
+    let id;
+    if((id=g("data-ajustar"))){ ctaAccion={id,tipo:"ajustar"}; renderCuentas(); const i=$("aj-"+id); if(i){ i.focus(); i.select(); } return; }
+    if((id=g("data-editarcta"))){ ctaAccion={id,tipo:"editar"}; renderCuentas(); const i=$("en-"+id); if(i) i.focus(); return; }
+    if(t.closest("[data-ctacancel]")){ ctaAccion=null; renderCuentas(); return; }
+    if((id=g("data-archivar"))||(id=g("data-restaurar"))){
+      const c=cuentaPorId(id); if(!c) return; const nueva=Object.assign({},c,{archivada:!c.archivada});
+      cuentas=cuentas.map(x=>x.id===id?nueva:x); render();
+      setStatus(nueva.archivada?`Cuenta ${c.nombre} archivada. Sus movimientos se conservan.`:`Cuenta ${c.nombre} restaurada.`,"ok");
+      encolar((nueva.archivada?"archivar ":"restaurar ")+c.nombre,[{accion:"cuenta_editar",cuenta:nueva}]); return;
+    }
+    if((id=g("data-borrarcta"))){
+      if(pendingDel!=="cta:"+id){ pendingDel="cta:"+id; renderCuentas(); return; }
+      pendingDel=null; const c=cuentaPorId(id); cuentas=cuentas.filter(x=>x.id!==id); render();
+      encolar("eliminar la cuenta "+(c?c.nombre:""),[{accion:"cuenta_borrar",id}]); return;
+    }
+  });
+  document.addEventListener("click",e=>{
+    const v=e.target.closest("[data-vercuenta]"); if(!v) return;
+    Object.assign(fil,{modo:"mes",cuenta:v.getAttribute("data-vercuenta")}); showTab("movimientos"); window.scrollTo(0,0); renderMovs();
+  });
+  document.getElementById("panel-cuentas").addEventListener("submit",e=>{
+    const f=e.target;
+    if(f.matches("[data-ajform]")){
+      e.preventDefault(); const id=f.getAttribute("data-ajform"); const c=cuentaPorId(id); const real=round2($("aj-"+id).value);
+      if(isNaN(real)) return; const dif=round2(real-saldoCuenta(id)); ctaAccion=null;
+      if(Math.abs(dif)<0.01){ renderCuentas(); setStatus(`El saldo de ${c.nombre} ya cuadra.`,"info"); return; }
+      const mov=movAjuste(id,dif,real); movs=movs.concat([mov]); render();
+      setStatus(`Saldo de ${c.nombre} ajustado a ${signo(real)} (diferencia de ${dif>0?"+":"−"}${fmtPEN(Math.abs(dif))}).`,"ok");
+      encolar("el ajuste de "+c.nombre,[{accion:"agregar",mov}]);
+    }
+    if(f.matches("[data-edform]")){
+      e.preventDefault(); const id=f.getAttribute("data-edform"); const c=cuentaPorId(id);
+      const nombre=$("en-"+id).value.trim(); if(!nombre) return;
+      const nueva=Object.assign({},c,{nombre,tipo:$("et-"+id).value}); cuentas=cuentas.map(x=>x.id===id?nueva:x); ctaAccion=null; render();
+      encolar("la cuenta "+nombre,[{accion:"cuenta_editar",cuenta:nueva}]);
+    }
+    if(f.id==="formAsignar"){
+      e.preventDefault(); const cid=$("asigCta").value; const lista=sinCuentaMovs(); if(!cid||!lista.length) return;
+      const pasos=lista.map(m=>{ const n=Object.assign({},m,{cuenta:cid}); return {accion:"editar",mov:n}; });
+      const ids=new Set(lista.map(m=>m.id)); movs=movs.map(m=>ids.has(m.id)?Object.assign({},m,{cuenta:cid}):m); render();
+      setStatus(`${lista.length} movimientos asignados a ${nombreCuenta(cid)}.`,"ok");
+      encolar("asignar movimientos a "+nombreCuenta(cid),pasos);
+    }
+  });
+
   // ---------- filtros de movimientos ----------
-  const fil={modo:"dia",dia:today(),desde:"",hasta:"",tipo:"",cat:"",metodo:"",q:""};
+  const fil={modo:"dia",dia:today(),desde:"",hasta:"",tipo:"",cat:"",metodo:"",q:"",cuenta:""};
   function isoMasDias(t,n){ const [y,m,d]=t.split("-").map(Number); const x=new Date(y,m-1,d+n); return x.getFullYear()+"-"+pad(x.getMonth()+1)+"-"+pad(x.getDate()); }
   const MES_LARGO=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
   function rangoActual(){
@@ -879,7 +1132,7 @@ form{display:flex;flex-direction:column;gap:14px}
   function filtrados(){
     const [d,h]=rangoActual(), q=sinTildes(fil.q.trim());
     return movs.filter(x=>x.fecha>=d && x.fecha<=h
-      && (!fil.tipo||tipoDe(x)===fil.tipo) && (!fil.cat||x.categoria===fil.cat) && (!fil.metodo||x.metodo===fil.metodo)
+      && (!fil.tipo||tipoDe(x)===fil.tipo) && (!fil.cat||x.categoria===fil.cat) && (!fil.metodo||x.metodo===fil.metodo) && (!fil.cuenta|| (fil.cuenta==="__sin" ? (!x.cuenta&&!esTransf(x)) : (x.cuenta===fil.cuenta||x.destino===fil.cuenta)))
       && (!q||sinTildes(x.nota+" "+x.categoria).includes(q)));
   }
   function llenarSelect(sel,valores,todos,actual){
@@ -892,6 +1145,9 @@ form{display:flex;flex-direction:column;gap:14px}
     llenarSelect($("fCat"),cats,"Todas las categorías",fil.cat);
     const mets=[...new Set(["Efectivo","Yape / Plin","Tarjeta de débito","Tarjeta de crédito","Transferencia","Otro"].concat(movs.map(x=>x.metodo)).filter(Boolean))];
     llenarSelect($("fMetodo"),mets,"Todos los medios de pago",fil.metodo);
+    const fc=$("fCuenta");
+    fc.innerHTML='<option value="">Todas las cuentas</option>'+cuentas.map(c=>`<option value="${esc(c.id)}">${esc(c.nombre)}${c.archivada?" (archivada)":""}</option>`).join("")+(movs.some(x=>!x.cuenta&&!esTransf(x))?'<option value="__sin">Sin cuenta</option>':"");
+    fc.value=[...fc.options].some(o=>o.value===fil.cuenta)?fil.cuenta:""; fc.hidden=!cuentas.length;
     $("fTipo").value=fil.tipo; if(document.activeElement!==$("fQ")) $("fQ").value=fil.q;
     // periodo
     const hoy=today(), ayer=isoMasDias(hoy,-1);
@@ -900,7 +1156,7 @@ form{display:flex;flex-direction:column;gap:14px}
     const [my,mm]=$("mes").value.split("-").map(Number); $("chipMes").textContent= mm? MES_LARGO[mm-1].charAt(0).toUpperCase()+MES_LARGO[mm-1].slice(1)+(my!==new Date().getFullYear()?" "+my:"") : "Este mes";
     $("dayNav").hidden = fil.modo!=="dia"; $("fDia").value=fil.dia; $("dNext").disabled = false;
     $("rangeBox").hidden = fil.modo!=="rango"; $("fDesde").value=fil.desde; $("fHasta").value=fil.hasta;
-    const extra=[fil.tipo,fil.cat,fil.metodo,fil.q.trim()].filter(Boolean).length;
+    const extra=[fil.tipo,fil.cat,fil.metodo,fil.q.trim(),fil.cuenta].filter(Boolean).length;
     $("fToggle").textContent = extra ? "Más filtros ("+extra+")" : "Más filtros";
     $("fLimpiar").hidden = !(extra || !(fil.modo==="dia"&&fil.dia===hoy));
     // datos
@@ -951,12 +1207,13 @@ form{display:flex;flex-direction:column;gap:14px}
   $("fHasta").addEventListener("change",()=>{ fil.hasta=$("fHasta").value; renderMovs(); });
   $("fTipo").addEventListener("change",()=>{ fil.tipo=$("fTipo").value; renderMovs(); });
   $("fCat").addEventListener("change",()=>{ fil.cat=$("fCat").value; renderMovs(); });
+  $("fCuenta").addEventListener("change",()=>{ fil.cuenta=$("fCuenta").value; renderMovs(); });
   $("fMetodo").addEventListener("change",()=>{ fil.metodo=$("fMetodo").value; renderMovs(); });
   let qTimer=null;
   $("fQ").addEventListener("input",()=>{ clearTimeout(qTimer); qTimer=setTimeout(()=>{ fil.q=$("fQ").value; renderMovs(); },200); });
   $("verTodos").addEventListener("click",()=>{ fil.modo="mes"; renderMovs(); });
   $("fToggle").addEventListener("click",()=>{ const o=$("moreFilters").classList.toggle("open"); $("fToggle").setAttribute("aria-expanded",o?"true":"false"); });
-  $("fLimpiar").addEventListener("click",()=>{ Object.assign(fil,{modo:"dia",dia:today(),desde:"",hasta:"",tipo:"",cat:"",metodo:"",q:""}); $("fQ").value=""; renderMovs(); });
+  $("fLimpiar").addEventListener("click",()=>{ Object.assign(fil,{modo:"dia",dia:today(),desde:"",hasta:"",tipo:"",cat:"",metodo:"",q:"",cuenta:""}); $("fQ").value=""; renderMovs(); });
 
   const DIAS=["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
   const MESES=["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
@@ -969,7 +1226,9 @@ form{display:flex;flex-direction:column;gap:14px}
   function txRow(x, conAcciones, conFecha, orden){
     const ing=x.tipo==="Ingreso", tr=esTransf(x);
     const [y,m,d]=x.fecha.split("-");
-    const meta=[conFecha?d+"/"+m:"", x.metodo, x.moneda==="USD"?"TC "+x.tc:""].filter(Boolean).map(esc).join(" · ");
+    const via = tr ? (x.cuenta&&x.destino ? nombreCuenta(x.cuenta)+" → "+nombreCuenta(x.destino) : x.metodo)
+                   : [x.cuenta?nombreCuenta(x.cuenta):"", x.metodo&&!(x.cuenta&&String(x.metodo).toLowerCase().includes(nombreCuenta(x.cuenta).toLowerCase()))?x.metodo:""].filter(Boolean).join(" · ");
+    const meta=[conFecha?d+"/"+m:"", via, x.moneda==="USD"?"TC "+x.tc:""].filter(Boolean).map(esc).join(" · ");
     const conf=pendingDel===x.id;
     return `<li class="tx${conAcciones?" has-acts":""}${orden&&orden.moved?" moving":""}" data-row="${esc(x.id)}">
       <div class="tx-ic${tr?" tr":ing?" in":""}" aria-hidden="true">${tr?"⇄":esc((x.categoria||"?").charAt(0).toUpperCase())}</div>
@@ -1085,8 +1344,9 @@ form{display:flex;flex-direction:column;gap:14px}
     }
   });
 
-  function movIngreso(p){
-    return {id:"m"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),tipo:"Ingreso",fecha:p.fecha,mes:p.fecha.slice(0,7),
+  function movIngreso(p, cuenta){
+    if(cuenta===undefined) cuenta = cuentasActivas().length ? ultimaCuenta() : "";
+    return {cuenta, destino:"",id:"m"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),tipo:"Ingreso",fecha:p.fecha,mes:p.fecha.slice(0,7),
       monto:p.monto,moneda:"PEN",tc:1,montoPEN:p.monto,categoria:CAT_PRESTAMO,
       metodo:p.entidad.toLowerCase()==="yape"?"Yape / Plin":"Transferencia",
       nota:"Préstamo "+p.entidad+(p.nota?" · "+p.nota:""),creado:new Date().toISOString(),prestamoId:refIngreso(p.id)};
@@ -1135,9 +1395,10 @@ form{display:flex;flex-direction:column;gap:14px}
     if(!(prestamo.cuota>0)) return err("Ingresa el monto de cada cuota.");
     if(!prestamo.primer) return err("Elige la fecha del primer vencimiento.");
     const conIngreso=$("pIngreso").checked;
+    const ctaIng = $("pCuentaWrap").hidden ? "" : $("pCuenta").value;
     const pasos=[{accion:"prestamo_agregar",prestamo}];
     prestamos=prestamos.concat([prestamo]);
-    if(conIngreso){ const mov=movIngreso(prestamo); movs=movs.concat([mov]); pasos.push({accion:"agregar",mov}); }
+    if(conIngreso){ const mov=movIngreso(prestamo, ctaIng); movs=movs.concat([mov]); pasos.push({accion:"agregar",mov}); }
     render();
     pm.textContent=`Préstamo de ${prestamo.entidad} registrado`+(conIngreso?` y ${fmtPEN(prestamo.monto)} como ingreso.`:"."); pm.className="msg";
     ["pEntidad","pMonto","pCuotas","pCuota","pPrimer","pNota"].forEach(id=>$(id).value=""); calcPrestamo();
@@ -1150,7 +1411,7 @@ form{display:flex;flex-direction:column;gap:14px}
   }
 
   // ---------- pestañas ----------
-  const TABS=["resumen","registrar","movimientos","prestamos","presupuesto"];
+  const TABS=["resumen","registrar","movimientos","cuentas","prestamos","presupuesto"];
   function showTab(name, noHash){
     if(!TABS.includes(name)) name="resumen";
     TABS.forEach(t=>{
