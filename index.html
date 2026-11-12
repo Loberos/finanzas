@@ -245,6 +245,11 @@ form{display:flex;flex-direction:column;gap:14px}
 .minibar i{display:block;height:100%;background:var(--good)} .minibar i.warn{background:var(--warn)} .minibar i.bad{background:var(--bad)}
 .scope{display:flex;flex-wrap:wrap;gap:10px;align-items:end}
 .scope label{flex:1 1 220px;max-width:340px}
+.medlist{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:1fr;gap:4px;font-size:13px}
+.medlist li{display:flex;justify-content:space-between;gap:10px;padding:5px 8px;background:var(--surface-2);border-radius:8px}
+.medlist b{font-family:var(--f-num);white-space:nowrap;font-weight:600}
+.transfgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px}
+.transfgrid .tglabel{grid-column:1/-1;font-size:12px;font-weight:700;color:var(--ink);text-transform:uppercase;letter-spacing:.05em;margin-top:4px}
 .notice{font-size:14px;background:var(--warn-bg);color:var(--warn);border-radius:var(--radius-s);padding:10px 14px}
 
 /* ---------- guardado en segundo plano ---------- */
@@ -335,7 +340,7 @@ form{display:flex;flex-direction:column;gap:14px}
       <button type="button" role="tab" id="tab-resumen" aria-controls="panel-resumen" data-tab="resumen">Resumen</button>
       <button type="button" role="tab" id="tab-registrar" aria-controls="panel-registrar" data-tab="registrar">Registrar</button>
       <button type="button" role="tab" id="tab-movimientos" aria-controls="panel-movimientos" data-tab="movimientos">Movimientos</button>
-      <button type="button" role="tab" id="tab-cuentas" aria-controls="panel-cuentas" data-tab="cuentas">Cuentas</button>
+      <button type="button" role="tab" id="tab-cuentas" aria-controls="panel-cuentas" data-tab="cuentas">Personas</button>
       <button type="button" role="tab" id="tab-prestamos" aria-controls="panel-prestamos" data-tab="prestamos">Préstamos <span class="count" id="loanCount" hidden></span></button>
       <button type="button" role="tab" id="tab-presupuesto" aria-controls="panel-presupuesto" data-tab="presupuesto">Presupuesto</button>
     </nav>
@@ -393,7 +398,7 @@ form{display:flex;flex-direction:column;gap:14px}
             <input type="radio" name="tipo" id="tipoI" value="Ingreso"><label class="i" for="tipoI">Ingreso</label>
             <input type="radio" name="tipo" id="tipoT" value="Transferencia"><label class="t" for="tipoT">Entre mis cuentas</label>
           </div>
-          <p class="transf-note" id="transfNote" hidden>Para pasar plata entre <strong>tus propias cuentas</strong> (por ejemplo, de Prexpe a tu Yape). Queda registrado, pero no suma ni resta en ingresos, gastos ni en tu saldo. Si le transfieres a otra persona, regístralo como <strong>Gasto</strong>.</p>
+          <p class="transf-note" id="transfNote" hidden>Para mover plata entre <strong>tus propios medios</strong> (por ejemplo, de Prexpe a tu Yape) o entre las personas que registras aquí. No cuenta como ingreso ni gasto. Si le pagas a alguien de fuera, regístralo como <strong>Gasto</strong>.</p>
           <div class="row2">
             <label for="fecha">Fecha<input type="date" id="fecha" required></label>
             <label for="moneda">Moneda
@@ -404,25 +409,31 @@ form{display:flex;flex-direction:column;gap:14px}
             <label for="monto">Monto<input type="number" id="monto" class="num" step="0.01" min="0.01" inputmode="decimal" placeholder="0.00" required></label>
             <label for="tc" id="tcWrap">Tipo de cambio<input type="number" id="tc" class="num" step="0.001" min="0.001" inputmode="decimal"></label>
           </div>
-          <label for="cuentaSel" id="cuentaWrap" hidden>Cuenta<select id="cuentaSel"></select></label>
+          <div class="row2" id="pmRow">
+            <label for="cuentaSel" id="cuentaWrap" hidden>Persona<select id="cuentaSel"></select></label>
+            <label for="metodo" id="metodoWrap">Medio
+              <select id="metodo">
+                <option>Efectivo</option><option>Yape / Plin</option><option>Tarjeta de débito</option><option>Tarjeta de crédito</option><option>Transferencia</option><option>Otro</option>
+              </select>
+            </label>
+          </div>
           <label for="categoria" id="catWrap">Categoría<select id="categoria"></select></label>
-          <div class="row2" id="transfSelWrap" hidden>
-            <label for="tDesdeSel">De la cuenta<select id="tDesdeSel"></select></label>
-            <label for="tHaciaSel">A la cuenta<select id="tHaciaSel"></select></label>
+          <div class="transfgrid" id="transfSelWrap" hidden>
+            <span class="tglabel">Sale de</span>
+            <label for="tDesdeSel">Persona<select id="tDesdeSel"></select></label>
+            <label for="tDesdeMed">Medio<select id="tDesdeMed"></select></label>
+            <span class="tglabel">Llega a</span>
+            <label for="tHaciaSel">Persona<select id="tHaciaSel"></select></label>
+            <label for="tHaciaMed">Medio<select id="tHaciaMed"></select></label>
+            <span class="hint" id="mismaHint" style="grid-column:1/-1"></span>
           </div>
           <div class="row2" id="transfWrap" hidden>
-            <label for="tDesde"><span id="tDesdeLbl">De mi cuenta</span><input type="text" id="tDesde" list="cuentas" maxlength="40" placeholder="Ej. Prexpe"></label>
-            <label for="tHacia"><span id="tHaciaLbl">A mi cuenta</span><input type="text" id="tHacia" list="cuentas" maxlength="40" placeholder="Ej. Yape"></label>
-            <span class="hint" id="mismaHint" style="grid-column:1/-1" hidden></span>
+            <label for="tDesde">De<input type="text" id="tDesde" list="cuentas" maxlength="40" placeholder="Ej. Prexpe"></label>
+            <label for="tHacia">A<input type="text" id="tHacia" list="cuentas" maxlength="40" placeholder="Ej. Yape"></label>
           </div>
           <datalist id="cuentas"><option>Yape</option><option>Plin</option><option>Efectivo</option><option>Prexpe</option><option>BCP</option><option>Interbank</option><option>BBVA</option><option>Scotiabank</option><option>Tarjeta de crédito</option></datalist>
           <label for="prestamoSel" id="prestamoWrap" hidden>¿Es pago de un préstamo?
             <select id="prestamoSel"></select>
-          </label>
-          <label for="metodo" id="metodoWrap">Medio de pago
-            <select id="metodo">
-              <option>Efectivo</option><option>Yape / Plin</option><option>Tarjeta de débito</option><option>Tarjeta de crédito</option><option>Transferencia</option><option>Otro</option>
-            </select>
           </label>
           <label for="nota">Descripción <span class="hint">(opcional)</span><input type="text" id="nota" maxlength="140" placeholder="Ej. Menú del almuerzo, recibo de luz…"></label>
           <div class="foot">
@@ -482,26 +493,20 @@ form{display:flex;flex-direction:column;gap:14px}
 
     <!-- CUENTAS -->
     <section class="panel" role="tabpanel" id="panel-cuentas" aria-labelledby="tab-cuentas" hidden>
-      <p class="notice" id="ctaAviso" hidden>Para usar cuentas, actualiza el Apps Script de tu hoja con el Code.gs versión 3 y publica una Nueva versión.</p>
+      <p class="notice" id="ctaAviso" hidden>Para registrar personas, actualiza el Apps Script de tu hoja con el Code.gs más reciente y publica una Nueva versión.</p>
       <div class="cols wide-left">
         <section class="card" aria-labelledby="ctaTitle">
-          <div class="cardhead"><h2 id="ctaTitle">Mis cuentas</h2><span class="tag" id="ctaTotal"></span></div>
+          <div class="cardhead"><h2 id="ctaTitle">Personas</h2><span class="tag" id="ctaTotal"></span></div>
           <div class="accgrid" id="accGrid"></div>
-          <details id="ctaArch" style="margin-top:14px" hidden><summary class="tag" style="cursor:pointer">Cuentas archivadas</summary><div class="accgrid" id="accArch" style="margin-top:10px"></div></details>
+          <details id="ctaArch" style="margin-top:14px" hidden><summary class="tag" style="cursor:pointer">Personas archivadas</summary><div class="accgrid" id="accArch" style="margin-top:10px"></div></details>
         </section>
         <section class="card" aria-labelledby="ctaNewTitle">
-          <h2 id="ctaNewTitle">Nueva cuenta</h2>
+          <h2 id="ctaNewTitle">Agregar persona</h2>
           <form id="formCuenta" novalidate>
-            <label for="cNombre">Nombre<input type="text" id="cNombre" list="cuentasSug" maxlength="40" placeholder="Ej. Yape, BCP, Efectivo" required></label>
-            <datalist id="cuentasSug"><option>Yape</option><option>Plin</option><option>Efectivo</option><option>Prexpe</option><option>BCP</option><option>Interbank</option><option>BBVA</option><option>Scotiabank</option></datalist>
-            <div class="row2">
-              <label for="cTipo">Tipo
-                <select id="cTipo"><option>Billetera digital</option><option>Banco</option><option>Efectivo</option><option>Tarjeta de crédito</option><option>App de préstamos</option><option>Otro</option></select>
-              </label>
-              <label for="cSaldo">Saldo actual S/<input type="number" id="cSaldo" class="num" step="0.01" inputmode="decimal" placeholder="0.00"></label>
-            </div>
-            <span class="hint">El saldo actual se registra como "Ajuste de saldo": no cuenta como ingreso ni gasto del mes.</span>
-            <button class="primary" type="submit" id="btnCuenta">Crear cuenta</button>
+            <label for="cNombre">Nombre<input type="text" id="cNombre" maxlength="40" placeholder="Ej. Randy" required></label>
+            <label for="cMedios" id="cMediosWrap">Sus medios <span class="hint">(separados por coma; puedes cambiarlos después)</span><input type="text" id="cMedios" maxlength="400" value="Yape, Plin, Efectivo, Tarjeta de débito, Tarjeta de crédito"></label>
+            <span class="hint">Después pulsa "Ajustar saldo" en su tarjeta para poner cuánto tiene en cada medio.</span>
+            <button class="primary" type="submit" id="btnCuenta">Agregar persona</button>
             <div class="msg" id="cuMsg" role="status" aria-live="polite"></div>
           </form>
         </section>
@@ -535,7 +540,10 @@ form{display:flex;flex-direction:column;gap:14px}
               <label for="pPrimer">Primer vencimiento<input type="date" id="pPrimer" required></label>
             </div>
             <label for="pNota">Descripción <span class="hint">(opcional)</span><input type="text" id="pNota" maxlength="140" placeholder="Ej. Crédito para la importación"></label>
-            <label for="pCuenta" id="pCuentaWrap" hidden>¿A qué cuenta llegó la plata?<select id="pCuenta"></select></label>
+            <div class="row2" id="pCuentaWrap" hidden>
+              <label for="pCuenta">¿A quién llegó la plata?<select id="pCuenta"></select></label>
+              <label for="pMedio">¿A qué medio?<select id="pMedio"></select></label>
+            </div>
             <label class="check" for="pIngreso"><input type="checkbox" id="pIngreso" checked><span>Registrar lo recibido como ingreso<span class="hint" style="display:block">En la categoría "Préstamo recibido"</span></span></label>
             <div class="calc" id="pCalc">Completa monto, cuotas y cuota para ver cuánto pagarás en total.</div>
             <button class="primary" type="submit" id="btnPrestamo">Guardar préstamo</button>
@@ -549,9 +557,9 @@ form{display:flex;flex-direction:column;gap:14px}
     <section class="panel" role="tabpanel" id="panel-presupuesto" aria-labelledby="tab-presupuesto" hidden>
       <div class="scope" id="scopeWrap" hidden>
         <label for="presScope">Presupuesto de<select id="presScope"></select></label>
-        <span class="hint" id="scopeHint">Cada cuenta puede tener sus propios límites. "Todas las cuentas" es tu presupuesto general.</span>
+        <span class="hint" id="scopeHint">Cada persona puede tener sus propios límites. "Todas las personas" es el presupuesto general.</span>
       </div>
-      <p class="notice" id="scopeAviso" hidden>Para guardar presupuestos por cuenta, actualiza el Apps Script de tu hoja a la versión 4 y publica una Nueva versión.</p>
+      <p class="notice" id="scopeAviso" hidden>Para guardar presupuestos por persona, actualiza el Apps Script de tu hoja a la versión 4 y publica una Nueva versión.</p>
       <div class="cols">
         <section class="card" aria-labelledby="pTitle">
           <div class="cardhead"><h2 id="pTitle">Cómo vas este mes</h2><span class="tag" id="pTag">Gastos convertidos a S/</span></div>
@@ -748,15 +756,18 @@ form{display:flex;flex-direction:column;gap:14px}
     const t = tipoSel()==="Transferencia", n = cuentasActivas().length;
     $("catWrap").hidden=t; $("metodoWrap").hidden=t; $("transfNote").hidden=!t;
     $("cuentaWrap").hidden = t || !n;
+    $("pmRow").hidden = t;
     $("transfSelWrap").hidden = !t || n<1;
-    const misma = n>=1 && $("tDesdeSel").value && $("tDesdeSel").value===$("tHaciaSel").value;
-    $("transfWrap").hidden = !t || (n>=1 && !misma);
-    $("tDesdeLbl").textContent = misma ? "Desde (app, banco…)" : "De mi cuenta";
-    $("tHaciaLbl").textContent = misma ? "Hacia (app, banco…)" : "A mi cuenta";
-    $("mismaHint").hidden = !misma;
-    if(misma) $("mismaHint").textContent = "Movimiento dentro de "+nombreCuenta($("tDesdeSel").value)+": queda registrado, pero no cambia su saldo.";
+    $("transfWrap").hidden = !t || n>=1;
+    const d=$("tDesdeSel").value, h=$("tHaciaSel").value;
+    $("mismaHint").textContent = !d ? "" : d===h ? `Dentro de ${nombreCuenta(d)}: su saldo total no cambia, solo pasa de un medio a otro.`
+                                                : `Sale de ${nombreCuenta(d)} y entra a ${nombreCuenta(h)}.`;
   }
-  ["tDesdeSel","tHaciaSel"].forEach(id=>$(id).addEventListener("change",camposSegunTipo));
+  function otroMedio(){ const a=$("tDesdeMed").value; return [...$("tHaciaMed").options].map(o=>o.value).find(v=>v!==a) || ""; }
+  $("cuentaSel").addEventListener("change",()=>llenarMedios($("metodo"),$("cuentaSel").value));
+  $("pCuenta").addEventListener("change",()=>llenarMedios($("pMedio"),$("pCuenta").value));
+  $("tDesdeSel").addEventListener("change",()=>{ llenarMedios($("tDesdeMed"),$("tDesdeSel").value); camposSegunTipo(); });
+  $("tHaciaSel").addEventListener("change",()=>{ llenarMedios($("tHaciaMed"),$("tHaciaSel").value); if($("tHaciaSel").value===$("tDesdeSel").value&&$("tHaciaMed").value===$("tDesdeMed").value){ const o=otroMedio(); if(o) $("tHaciaMed").value=o; } camposSegunTipo(); });
   function fillCategorias(){
     const tipo = tipoSel();
     const t = tipo==="Transferencia";
@@ -780,11 +791,10 @@ form{display:flex;flex-direction:column;gap:14px}
     const tipo = transf ? "Ingreso" : tipoForm;
     const conSel = !$("transfSelWrap").hidden;
     const desdeId = transf&&conSel ? $("tDesdeSel").value : "", haciaId = transf&&conSel ? $("tHaciaSel").value : "";
-    const misma = conSel && desdeId===haciaId;   // dentro de una misma cuenta (p. ej. Randy: Prexpe → Yape)
-    const desde = conSel&&!misma ? nombreCuenta(desdeId) : $("tDesde").value.trim(), hacia = conSel&&!misma ? nombreCuenta(haciaId) : $("tHacia").value.trim();
-    if(transf && misma && (!desde||!hacia)){ showMsg("Es la misma cuenta: escribe desde dónde y hacia dónde moviste la plata (por ejemplo Prexpe → Yape).",true); (desde?$("tHacia"):$("tDesde")).focus(); return; }
-    if(transf && (!desde||!hacia)){ showMsg("Escribe de cuál de tus cuentas sale la plata y a cuál llega.",true); (desde?$("tHacia"):$("tDesde")).focus(); return; }
-    if(transf && desde.toLowerCase()===hacia.toLowerCase()){ showMsg("Las cuentas de origen y destino deben ser distintas.",true); $("tHacia").focus(); return; }
+    // con personas: "medio → medio" en metodo; persona de origen en cuenta y de destino en destino
+    const desde = conSel ? $("tDesdeMed").value : $("tDesde").value.trim(), hacia = conSel ? $("tHaciaMed").value : $("tHacia").value.trim();
+    if(transf && (!desde||!hacia)){ showMsg("Indica de dónde sale la plata y a dónde llega.",true); return; }
+    if(transf && desdeId===haciaId && desde.toLowerCase()===hacia.toLowerCase()){ showMsg("El origen y el destino son el mismo medio. Elige otro medio o persona.",true); $("tHaciaMed").focus(); return; }
     const fecha=$("fecha").value, moneda=$("moneda").value;
     const monto=round2($("monto").value);
     const tc = moneda==="USD" ? Number($("tc").value) : 1;
@@ -798,8 +808,8 @@ form{display:flex;flex-direction:column;gap:14px}
       prestamoId: transf ? "" : orig && String(orig.prestamoId||"").startsWith("r:") ? orig.prestamoId : ($("prestamoWrap").hidden ? "" : $("prestamoSel").value),
       cuenta: transf ? desdeId : ($("cuentaWrap").hidden ? (orig?orig.cuenta||"":"") : $("cuentaSel").value),
       destino: transf ? haciaId : ""};
-    if(!transf && mov.cuenta) guardarUltimaCuenta(mov.cuenta);
-    const etiqueta = transf ? `Movimiento entre tus cuentas de ${fmtCur(monto,moneda)} (${desde} → ${hacia})` : `${tipo} de ${fmtCur(monto,moneda)}`;
+    if(!transf && mov.cuenta){ guardarUltimaCuenta(mov.cuenta); guardarUltimoMedio(mov.cuenta, mov.metodo); }
+    const etiqueta = transf ? `Movimiento de ${fmtCur(monto,moneda)} (${conSel?nombreCuenta(desdeId)+" · ":""}${desde} → ${conSel&&haciaId!==desdeId?nombreCuenta(haciaId)+" · ":""}${hacia})` : `${tipo} de ${fmtCur(monto,moneda)}`;
     // Se muestra al instante y se guarda en segundo plano.
     // Editar = borrar la fila original y escribirla de nuevo con el mismo ID (así no hace falta cambiar el Apps Script)
     if(orig){ movs=movs.map(m=>m.id===orig.id?mov:m); encolar(etiqueta,[{accion:"editar",mov}]); }
@@ -819,9 +829,10 @@ form{display:flex;flex-direction:column;gap:14px}
     if(esTransf(m)){
       const [a,b]=String(m.metodo||"").split("→").map(t=>t.trim()); $("tDesde").value=a||""; $("tHacia").value=b||"";
       if(m.cuenta) selCuenta($("tDesdeSel"),m.cuenta); if(m.destino) selCuenta($("tHaciaSel"),m.destino);
+      if(m.cuenta){ llenarMedios($("tDesdeMed"),m.cuenta,a); llenarMedios($("tHaciaMed"),m.destino||m.cuenta,b); }
       camposSegunTipo();
     }
-    else { ensureOption($("categoria"),m.categoria); selCuenta($("cuentaSel"),m.cuenta||""); }
+    else { ensureOption($("categoria"),m.categoria); selCuenta($("cuentaSel"),m.cuenta||""); llenarMedios($("metodo"),m.cuenta||"",m.metodo||""); }
     togglePrestamo();
     $("fecha").value=m.fecha; $("moneda").value=m.moneda; toggleTc();
     $("monto").value=Number(m.monto).toFixed(2); $("tc").value=m.moneda==="USD"?m.tc:cfg.tc;
@@ -924,13 +935,13 @@ form{display:flex;flex-direction:column;gap:14px}
     const act=cuentasActivas();
     if(presScope && !act.some(c=>c.id===presScope)) presScope="";
     $("scopeWrap").hidden=!act.length;
-    $("presScope").innerHTML='<option value="">Todas las cuentas (general)</option>'+act.map(c=>`<option value="${esc(c.id)}">${esc(c.nombre)}</option>`).join("");
+    $("presScope").innerHTML='<option value="">Todas las personas (general)</option>'+act.map(c=>`<option value="${esc(c.id)}">${esc(c.nombre)}</option>`).join("");
     $("presScope").value=presScope;
     $("scopeAviso").hidden = !presScope || servidorV4;
     $("btnBudget").disabled = !!presScope && !servidorV4;
     $("pTag").textContent = presScope ? "Solo gastos de "+nombreCuenta(presScope) : "Gastos de todas las cuentas, en S/";
     $("bTitle").textContent = presScope ? "Límites de "+nombreCuenta(presScope) : "Límites por categoría";
-    $("budget2").innerHTML = budgetHTML(presDe(presScope), gastoPorCat(presScope), presScope?"Esta cuenta no tiene gastos ni límites este mes.":"Sin gastos ni límites este mes.");
+    $("budget2").innerHTML = budgetHTML(presDe(presScope), gastoPorCat(presScope), presScope?"Esta persona no tiene gastos ni límites este mes.":"Sin gastos ni límites este mes.");
   }
   $("presScope").addEventListener("change",()=>{ presScope=$("presScope").value; renderPresupuestoScope(); renderBudgetEditor(); $("bMsg").textContent=""; });
 
@@ -999,8 +1010,8 @@ form{display:flex;flex-direction:column;gap:14px}
     $("tDispH").textContent = ajustes.length
       ? "Último ajuste el "+ajustes[0].fecha.split("-").reverse().join("/")+(futuros?" · no incluye "+futuros+" movimiento(s) con fecha futura":"")
       : (movs.length ? "¿No cuadra con tu cuenta? Pulsa Ajustar saldo y pon tu saldo real." : "Registra tus movimientos o pon tu saldo actual con Ajustar saldo.");
-    $("btnAjustar").textContent = cuentasActivas().length ? "Ver mis cuentas" : "Ajustar saldo";
-    if(cuentasActivas().length) $("tDispH").textContent = "Suma de tus "+cuentasActivas().length+(cuentasActivas().length===1?" cuenta":" cuentas")+(movs.some(x=>!x.cuenta)?" y movimientos sin cuenta":"")+(futuros?" · no incluye "+futuros+" con fecha futura":"");
+    $("btnAjustar").textContent = cuentasActivas().length ? "Ver personas" : "Ajustar saldo";
+    if(cuentasActivas().length){ const ns=cuentasActivas().map(c=>c.nombre); $("tDispH").textContent = "Suma de "+(ns.length<=3?ns.slice(0,-1).join(", ")+(ns.length>1?" y ":"")+ns[ns.length-1]:"tus "+ns.length+" personas")+(movs.some(x=>!x.cuenta)?" y movimientos sin asignar":"")+(futuros?" · no incluye "+futuros+" con fecha futura":""); }
     renderStrip();
     const deuda=prestamos.reduce((a,p)=>a+estadoPrestamo(p).saldo,0);
     $("tDispNeto").innerHTML = deuda>0 ? `Después de pagar tus préstamos: <b>${disp-deuda<0?"−":""}${fmtPEN(Math.abs(round2(disp-deuda)))}</b>` : "";
@@ -1060,11 +1071,16 @@ form{display:flex;flex-direction:column;gap:14px}
     const u=ultimaCuenta();
     const activa=id=>cuentasActivas().some(c=>c.id===id)?id:"";
     const prev={c:editando?$("cuentaSel").value:activa($("cuentaSel").value),d:activa($("tDesdeSel").value),h:activa($("tHaciaSel").value),p:activa($("pCuenta").value)};
-    opcionesCuentas($("cuentaSel"), prev.c||u, '<option value="">Sin cuenta</option>');
+    opcionesCuentas($("cuentaSel"), prev.c||u, '<option value="">Sin asignar</option>');
     opcionesCuentas($("tDesdeSel"), prev.d||u);
-    const otra=(cuentasActivas().find(c=>c.id!==$("tDesdeSel").value)||{}).id||$("tDesdeSel").value;
-    opcionesCuentas($("tHaciaSel"), prev.h && prev.h!==$("tDesdeSel").value ? prev.h : otra);
+    opcionesCuentas($("tHaciaSel"), prev.h||$("tDesdeSel").value);   // por defecto la misma persona (de un medio a otro)
     opcionesCuentas($("pCuenta"), prev.p||u);
+    if(cuentasActivas().length){
+      llenarMedios($("metodo"), $("cuentaSel").value, $("metodo").value);
+      llenarMedios($("tDesdeMed"), $("tDesdeSel").value, $("tDesdeMed").value);
+      llenarMedios($("tHaciaMed"), $("tHaciaSel").value, $("tHaciaMed").value || otroMedio());
+      llenarMedios($("pMedio"), $("pCuenta").value, $("pMedio").value);
+    }
     $("pCuentaWrap").hidden = !cuentasActivas().length || !$("pIngreso").checked;
     camposSegunTipo();
   }
@@ -1075,100 +1091,164 @@ form{display:flex;flex-direction:column;gap:14px}
     el.hidden=!act.length; if(!act.length){ el.innerHTML=""; return; }
     const sin=sinCuentaMovs();
     el.innerHTML = act.map(c=>{ const v=saldoCuenta(c.id); return `<button type="button" class="accchip" style="--c:${colorCuenta(c.id)}" data-vercuenta="${esc(c.id)}"><span class="n">${esc(c.nombre)}</span><span class="s ${v<0?"neg":""}">${signo(v)}</span></button>`; }).join("")
-      + (sin.length?`<button type="button" class="accchip" data-goto="cuentas"><span class="n">Sin cuenta</span><span class="s">${signo(saldoCuenta(""))}</span></button>`:"");
+      + (sin.length?`<button type="button" class="accchip" data-goto="cuentas"><span class="n">Sin asignar</span><span class="s">${signo(saldoCuenta(""))}</span></button>`:"");
   }
 
   let ctaAccion=null; // {id, tipo:"ajustar"|"editar"}
-  function infoCuenta(id){ return Object.assign({detalle:"",color:""}, ((ajustes.cuentaInfo||{})[id])||{}); }
+  function infoCuenta(id){ return Object.assign({detalle:"",color:"",medios:null}, ((ajustes.cuentaInfo||{})[id])||{}); }
   function colorCuenta(id){ const i=infoCuenta(id); if(i.color) return i.color; const k=cuentas.findIndex(c=>c.id===id); return COLORES[(k<0?0:k)%COLORES.length]; }
+
+  // ---------- medios de cada persona (Yape, Plin, tarjeta…) ----------
+  const MEDIOS_DEF=["Yape","Plin","Efectivo","Tarjeta de débito","Tarjeta de crédito","Transferencia bancaria"];
+  const KEY_ULT_MEDIO="finanzas.ultimoMedio";
+  const ladosTransf = m => { const p=String(m||"").split("→").map(t=>t.trim()); return [p[0]||"", p[1]||""]; };
+  // medios configurados + los que ya aparecen en sus movimientos (para no perder los antiguos como "Yape / Plin")
+  function mediosDe(cid){
+    const conf = infoCuenta(cid).medios;
+    const base = Array.isArray(conf)&&conf.length ? conf.slice() : MEDIOS_DEF.slice();
+    movs.forEach(x=>{
+      if(esTransf(x)){ const [a,b]=ladosTransf(x.metodo); if(x.cuenta===cid&&a) base.push(a); if(x.destino===cid&&b) base.push(b); }
+      else if(x.cuenta===cid && x.metodo && x.categoria!==CAT_AJUSTE) base.push(x.metodo);
+      else if(x.cuenta===cid && x.categoria===CAT_AJUSTE && x.metodo && x.metodo!=="Otro") base.push(x.metodo);
+    });
+    return [...new Set(base.filter(Boolean))];
+  }
+  function ultimoMedio(cid){ try{ return (JSON.parse(localStorage.getItem(KEY_ULT_MEDIO)||"{}")||{})[cid]||""; }catch(e){ return ""; } }
+  function guardarUltimoMedio(cid,medio){ try{ const o=JSON.parse(localStorage.getItem(KEY_ULT_MEDIO)||"{}")||{}; o[cid]=medio; localStorage.setItem(KEY_ULT_MEDIO,JSON.stringify(o)); }catch(e){} }
+  function llenarMedios(sel,cid,actual){
+    const lista = cid ? mediosDe(cid) : MEDIOS_DEF.concat(["Otro"]);
+    const quiero = actual || (cid?ultimoMedio(cid):"") || lista[0];
+    sel.innerHTML = lista.map(m=>`<option>${esc(m)}</option>`).join("");
+    ensureOption(sel, quiero);
+  }
+  // saldo de un medio dentro de una persona
+  function saldoMedio(cid,medio){
+    const hoy=today(); let t=0;
+    movs.forEach(x=>{
+      if(x.fecha>hoy) return;
+      if(esTransf(x)){ const [a,b]=ladosTransf(x.metodo); if(x.cuenta===cid&&a===medio) t-=x.montoPEN; if(x.destino===cid&&b===medio) t+=x.montoPEN; }
+      else if(x.cuenta===cid && x.metodo===medio) t+= x.tipo==="Ingreso"?x.montoPEN:-x.montoPEN;
+    });
+    return round2(t);
+  }
+
+  // movimientos de una persona que usan un medio (incluye cada lado de las transferencias)
+  function usosMedio(cid,medio){
+    return movs.filter(x=>{ if(esTransf(x)){ const [a,b]=ladosTransf(x.metodo); return (x.cuenta===cid&&a===medio)||(x.destino===cid&&b===medio); }
+      return x.cuenta===cid && x.metodo===medio; });
+  }
   function tarjetaCuenta(c){
     const info=infoCuenta(c.id), col=colorCuenta(c.id);
     const v=saldoCuenta(c.id), mc=mesCuenta(c.id), usados=movs.some(x=>x.cuenta===c.id||x.destino===c.id);
     const del=pendingDel==="cta:"+c.id;
+    const medios=mediosDe(c.id).map(m=>({m,s:saldoMedio(c.id,m)}));
+    const conSaldo=medios.filter(x=>Math.abs(x.s)>=0.005), enCero=medios.length-conSaldo.length;
+    const id=esc(c.id);
     let form="";
-    if(ctaAccion&&ctaAccion.id===c.id&&ctaAccion.tipo==="ajustar") form=`<form class="accform" data-ajform="${esc(c.id)}" novalidate>
-        <label for="aj-${esc(c.id)}">¿Cuánto tienes de verdad hoy en ${esc(c.nombre)}? (S/)<input type="number" id="aj-${esc(c.id)}" class="num" step="0.01" inputmode="decimal" value="${v.toFixed(2)}"></label>
+    if(ctaAccion&&ctaAccion.id===c.id&&ctaAccion.tipo==="ajustar"){
+      const m0=ctaAccion.medio||(conSaldo[0]||medios[0]||{m:""}).m;
+      form=`<form class="accform" data-ajform="${id}" novalidate>
+        <label for="ajm-${id}">Medio<select id="ajm-${id}" data-ajmedio="${id}">${medios.map(x=>`<option${x.m===m0?" selected":""}>${esc(x.m)}</option>`).join("")}</select></label>
+        <label for="aj-${id}">¿Cuánto hay de verdad hoy en ${esc(m0)} de ${esc(c.nombre)}? (S/)<input type="number" id="aj-${id}" class="num" step="0.01" inputmode="decimal" value="${saldoMedio(c.id,m0).toFixed(2)}"></label>
+        <span class="hint">La diferencia se registra como "Ajuste de saldo": no cuenta como ingreso ni gasto del mes.</span>
         <div class="foot"><button type="submit" class="primary small">Guardar saldo</button><button type="button" class="small" data-ctacancel>Cancelar</button></div></form>`;
-    if(ctaAccion&&ctaAccion.id===c.id&&ctaAccion.tipo==="editar") form=`<form class="accform" data-edform="${esc(c.id)}" novalidate>
-        <label for="en-${esc(c.id)}">Nombre<input type="text" id="en-${esc(c.id)}" maxlength="40" value="${esc(c.nombre)}"></label>
-        <label for="et-${esc(c.id)}">Tipo<select id="et-${esc(c.id)}">${["Billetera digital","Banco","Efectivo","Tarjeta de crédito","App de préstamos","Otro"].map(t=>`<option${t===c.tipo?" selected":""}>${t}</option>`).join("")}</select></label>
-        ${servidorV4?`<label for="ed-${esc(c.id)}">Detalle <span class="hint">(opcional: número, titular, para qué la usas…)</span><input type="text" id="ed-${esc(c.id)}" maxlength="80" value="${esc(info.detalle)}" placeholder="Ej. Cuenta sueldo ****1234"></label>
-        <fieldset style="border:none;margin:0;padding:0"><legend class="hint" style="font-weight:600;margin-bottom:6px">Color</legend><div class="swatches">${COLORES.map((k,n)=>`<input type="radio" name="ec-${esc(c.id)}" id="ec-${esc(c.id)}-${n}" value="${k}"${k===col?" checked":""}><label for="ec-${esc(c.id)}-${n}" style="--c:${k}" title="Color ${n+1}"></label>`).join("")}</div></fieldset>`
-        :'<span class="hint">Para agregar detalle y color, actualiza el Apps Script a la versión 4.</span>'}
-        <div class="foot"><button type="submit" class="primary small">Guardar</button><button type="button" class="small" data-ctacancel>Cancelar</button></div></form>`;
+    }
+    if(ctaAccion&&ctaAccion.id===c.id&&ctaAccion.tipo==="editar") form=`<form class="accform" data-edform="${id}" novalidate>
+        <label for="en-${id}">Nombre<input type="text" id="en-${id}" maxlength="40" value="${esc(c.nombre)}"></label>
+        ${servidorV4?`<label for="em-${id}">Medios <span class="hint">(separados por coma)</span><input type="text" id="em-${id}" maxlength="400" value="${esc((Array.isArray(info.medios)&&info.medios.length?info.medios:MEDIOS_DEF).join(", "))}"></label>
+        <label for="ed-${id}">Detalle <span class="hint">(opcional)</span><input type="text" id="ed-${id}" maxlength="80" value="${esc(info.detalle)}" placeholder="Ej. DNI, celular, banco principal…"></label>
+        <fieldset style="border:none;margin:0;padding:0"><legend class="hint" style="font-weight:600;margin-bottom:6px">Color</legend><div class="swatches">${COLORES.map((k,n)=>`<input type="radio" name="ec-${id}" id="ec-${id}-${n}" value="${k}"${k===col?" checked":""}><label for="ec-${id}-${n}" style="--c:${k}" title="Color ${n+1}"></label>`).join("")}</div></fieldset>`
+        :'<span class="hint">Para editar sus medios, detalle y color, actualiza el Apps Script a la versión 4.</span>'}
+        <div class="foot"><button type="submit" class="primary small">Guardar</button><button type="button" class="small" data-ctacancel>Cancelar</button></div>
+        <fieldset style="border:none;margin:6px 0 0;padding:10px 0 0;border-top:1px solid var(--line)"><legend class="hint" style="font-weight:600">Pasar movimientos de un medio a otro</legend>
+          <div class="row2" style="margin-top:6px">
+            <label for="um1-${id}">De<select id="um1-${id}">${medios.filter(x=>usosMedio(c.id,x.m).length).map(x=>`<option>${esc(x.m)}</option>`).join("")}</select></label>
+            <label for="um2-${id}">A<select id="um2-${id}">${medios.map(x=>`<option>${esc(x.m)}</option>`).join("")}</select></label>
+          </div>
+          <button type="button" class="small" data-unir="${id}" style="margin-top:8px">Pasar movimientos</button>
+          <span class="hint" style="display:block;margin-top:4px">Útil para corregir medios antiguos como "Yape / Plin" o "Transferencia".</span>
+        </fieldset></form>`;
     const up=usoPres(c.id);
     const presLinea = up.total>0 ? `<div class="accmes"><span>Presupuesto:</span><span class="minibar"><i class="${up.p>1?"bad":up.p>=0.8?"warn":""}" style="width:${Math.min(100,up.p*100)}%"></i></span><b class="${up.p>1?"neg":""}">${Math.round(up.p*100)}%</b><span>${fmtPEN(up.gasto)} de ${fmtPEN(up.total)}</span></div>` : "";
     return `<div class="acc colored" style="--c:${col}">
-      <div class="acchead"><div><strong>${esc(c.nombre)}</strong><div class="tag">${esc(c.tipo)}${c.archivada?" · archivada":""}${info.detalle?" · "+esc(info.detalle):""}</div></div></div>
+      <div class="acchead"><div><strong>${esc(c.nombre)}</strong><div class="tag">${c.archivada?"Archivada · ":""}${medios.length} medios${info.detalle?" · "+esc(info.detalle):""}</div></div></div>
       <div class="accsaldo ${v<0?"neg":""}">${signo(v)}</div>
+      ${conSaldo.length?`<ul class="medlist">${conSaldo.map(x=>`<li><span>${esc(x.m)}</span><b class="${x.s<0?"neg":""}">${signo(x.s)}</b></li>`).join("")}</ul>`:""}
+      ${enCero&&conSaldo.length?`<span class="tag">${enCero} ${enCero===1?"medio":"medios"} en S/ 0.00</span>`:""}
       <div class="accmes"><span>Este mes:</span><b class="pos">+${fmtPEN(mc.ing)}</b><b class="neg">−${fmtPEN(mc.gas)}</b></div>
       ${presLinea}
       ${(()=>{ const ps=prestamos.filter(p=>cuentaDePrestamo(p)===c.id).map(p=>({p,e:estadoPrestamo(p)})).filter(x=>x.e.saldo>0);
         return ps.length?`<div class="accmes"><span>Préstamos:</span>${ps.map(x=>`<span>${esc(x.p.entidad)} <b class="neg">${fmtPEN(x.e.saldo)}</b></span>`).join("")}<button type="button" class="linkbtn" data-goto="prestamos">Ver</button></div>`:""; })()}
       ${form}
       <div class="accacts">
-        ${c.archivada?`<button type="button" class="small" data-restaurar="${esc(c.id)}">Restaurar</button>`:
-          `<button type="button" class="small" data-vercuenta="${esc(c.id)}">Ver movimientos</button>
-           <button type="button" class="small" data-ajustar="${esc(c.id)}">Ajustar saldo</button>
-           <button type="button" class="small" data-editarcta="${esc(c.id)}">Editar</button>
-           <button type="button" class="small" data-prescta="${esc(c.id)}">Presupuesto</button>`}
-        ${usados ? (c.archivada?"":`<button type="button" class="small" data-archivar="${esc(c.id)}" title="Tiene movimientos: se oculta pero se conserva">Archivar</button>`)
-                 : `<button type="button" class="small del${del?" confirm":""}" data-borrarcta="${esc(c.id)}">${del?"¿Eliminar?":"Eliminar"}</button>`}
+        ${c.archivada?`<button type="button" class="small" data-restaurar="${id}">Restaurar</button>`:
+          `<button type="button" class="small" data-vercuenta="${id}">Ver movimientos</button>
+           <button type="button" class="small" data-ajustar="${id}">Ajustar saldo</button>
+           <button type="button" class="small" data-editarcta="${id}">Editar</button>
+           <button type="button" class="small" data-prescta="${id}">Presupuesto</button>`}
+        ${usados ? (c.archivada?"":`<button type="button" class="small" data-archivar="${id}" title="Tiene movimientos: se oculta pero se conserva">Archivar</button>`)
+                 : `<button type="button" class="small del${del?" confirm":""}" data-borrarcta="${id}">${del?"¿Eliminar?":"Eliminar"}</button>`}
       </div></div>`;
   }
   function renderCuentas(){
     $("ctaAviso").hidden = servidorV3 || !conn;
     $("formCuenta").querySelectorAll("input,select,button").forEach(el=>el.disabled=!servidorV3);
+    $("cMediosWrap").hidden = !servidorV4;
     const act=cuentasActivas(), arch=cuentas.filter(c=>c.archivada);
     const sin=sinCuentaMovs();
     let html=act.map(tarjetaCuenta).join("");
     if(sin.length){
       const v=saldoCuenta("");
       html+=`<div class="acc sincuenta">
-        <div class="acchead"><div><strong>Sin cuenta</strong><div class="tag">${sin.length} ${sin.length===1?"movimiento":"movimientos"} sin cuenta asignada</div></div></div>
+        <div class="acchead"><div><strong>Sin asignar</strong><div class="tag">${sin.length} ${sin.length===1?"movimiento":"movimientos"} sin persona</div></div></div>
         <div class="accsaldo ${v<0?"neg":""}">${signo(v)}</div>
         ${act.length&&servidorV3?`<form class="accform" id="formAsignar" novalidate>
-          <label for="asigCta">Pasar todos a la cuenta<select id="asigCta">${act.map(c=>`<option value="${esc(c.id)}">${esc(c.nombre)}</option>`).join("")}</select></label>
+          <label for="asigCta">Pasar todos a<select id="asigCta">${act.map(c=>`<option value="${esc(c.id)}">${esc(c.nombre)}</option>`).join("")}</select></label>
           <button type="submit" class="primary small">Asignar ${sin.length} ${sin.length===1?"movimiento":"movimientos"}</button>
           <span class="hint">También puedes asignarlos uno por uno con Editar en Movimientos.</span></form>`
           : servidorV3 ? `<form class="accform" id="formConvertir" novalidate>
-          <strong style="font-size:14px">Convertir en una cuenta</strong>
-          <label for="cvNombre">Nombre<input type="text" id="cvNombre" list="cuentasSug" maxlength="40" placeholder="Ej. Yape"></label>
-          <label for="cvTipo">Tipo<select id="cvTipo">${["Billetera digital","Banco","Efectivo","Tarjeta de crédito","App de préstamos","Otro"].map(t=>`<option>${t}</option>`).join("")}</select></label>
-          <button type="submit" class="primary small">Crear cuenta con estos movimientos</button>
-          <span class="hint">Se crea la cuenta y los ${sin.length} movimientos pasan a ella. Su saldo queda en ${signo(v)}.</span></form>`
-          : '<span class="hint">Actualiza el Apps Script para poder crear cuentas.</span>'}
+          <strong style="font-size:14px">¿De quién son?</strong>
+          <label for="cvNombre">Nombre de la persona<input type="text" id="cvNombre" maxlength="40" placeholder="Ej. Randy"></label>
+          <button type="submit" class="primary small">Crear persona con estos movimientos</button>
+          <span class="hint">Los ${sin.length} movimientos pasan a esa persona. Su saldo queda en ${signo(v)}.</span></form>`
+          : '<span class="hint">Actualiza el Apps Script para poder crear personas.</span>'}
         <div class="accacts"><button type="button" class="small" data-vercuenta="__sin">Ver movimientos</button></div></div>`;
     }
-    $("accGrid").innerHTML = html || '<div class="empty">Aún no tienes cuentas. Crea la primera con el formulario: por ejemplo Yape, BCP o Efectivo.</div>';
+    $("accGrid").innerHTML = html || '<div class="empty">Aún no registraste personas. Crea la primera con el formulario (por ejemplo Randy) y elige sus medios: Yape, Plin, tarjeta…</div>';
     $("ctaArch").hidden=!arch.length; $("accArch").innerHTML=arch.map(tarjetaCuenta).join("");
     const tot=round2(act.reduce((a,c)=>a+saldoCuenta(c.id),0)+(sin.length?saldoCuenta(""):0));
     $("ctaTotal").textContent = act.length ? "Total: "+signo(tot) : "";
     renderCuentasSelects();
   }
 
-  function movAjuste(cid, dif, real, nota){
+  function movAjuste(cid, dif, real, nota, medio){
     return {id:nuevoId("m"),tipo:dif>0?"Ingreso":"Gasto",fecha:today(),mes:today().slice(0,7),monto:Math.abs(dif),moneda:"PEN",tc:1,montoPEN:Math.abs(dif),
-      categoria:CAT_AJUSTE,metodo:"Otro",nota:nota||("Saldo real informado: "+fmtPEN(real)),creado:new Date().toISOString(),prestamoId:"",cuenta:cid,destino:""};
+      categoria:CAT_AJUSTE,metodo:medio||"Otro",nota:nota||("Saldo real informado: "+fmtPEN(real)),creado:new Date().toISOString(),prestamoId:"",cuenta:cid,destino:""};
   }
+  const listaMedios = txt => [...new Set(String(txt||"").split(",").map(t=>t.trim()).filter(Boolean))];
+  function pasoAjustes(){ return {accion:"config",config:{ajustes:JSON.parse(JSON.stringify(ajustes))}}; }
+  function setInfo(id,cambios){ ajustes.cuentaInfo=Object.assign({},ajustes.cuentaInfo||{}); ajustes.cuentaInfo[id]=Object.assign({},infoCuenta(id),cambios); }
 
   $("formCuenta").addEventListener("submit",e=>{
     e.preventDefault();
-    const cm=$("cuMsg"), nombre=$("cNombre").value.trim(), saldo=$("cSaldo").value.trim()===""?0:round2($("cSaldo").value);
-    if(!nombre){ cm.textContent="Escribe el nombre de la cuenta."; cm.className="msg err"; $("cNombre").focus(); return; }
-    if(cuentas.some(c=>c.nombre.toLowerCase()===nombre.toLowerCase())){ cm.textContent="Ya tienes una cuenta con ese nombre."; cm.className="msg err"; return; }
-    if(isNaN(saldo)){ cm.textContent="El saldo no es un número válido."; cm.className="msg err"; return; }
-    const cuenta={id:nuevoId("c"),nombre,tipo:$("cTipo").value,archivada:false,creado:new Date().toISOString()};
+    const cm=$("cuMsg"), nombre=$("cNombre").value.trim();
+    if(!nombre){ cm.textContent="Escribe el nombre de la persona."; cm.className="msg err"; $("cNombre").focus(); return; }
+    if(cuentas.some(c=>c.nombre.toLowerCase()===nombre.toLowerCase())){ cm.textContent="Ya registraste a alguien con ese nombre."; cm.className="msg err"; return; }
+    const cuenta={id:nuevoId("c"),nombre,tipo:"Otro",archivada:false,creado:new Date().toISOString()};
     const pasos=[{accion:"cuenta_agregar",cuenta}];
     cuentas=cuentas.concat([cuenta]);
-    if(Math.abs(saldo)>=0.01){ const mov=movAjuste(cuenta.id,saldo,saldo,"Saldo inicial de la cuenta "+nombre); movs=movs.concat([mov]); pasos.push({accion:"agregar",mov}); }
+    if(servidorV4){ const md=listaMedios($("cMedios").value); setInfo(cuenta.id,{medios:md.length?md:MEDIOS_DEF.slice()}); pasos.push(pasoAjustes()); }
     if(cuentasActivas().length===1) guardarUltimaCuenta(cuenta.id);
     render();
-    cm.textContent=`Cuenta ${nombre} creada`+(Math.abs(saldo)>=0.01?` con ${signo(saldo)}.`:"."); cm.className="msg";
-    $("cNombre").value=""; $("cSaldo").value="";
-    encolar("la cuenta "+nombre,pasos);
+    cm.textContent=`${nombre} agregado. Usa "Ajustar saldo" en su tarjeta para poner cuánto tiene en cada medio.`; cm.className="msg";
+    $("cNombre").value="";
+    encolar("la persona "+nombre,pasos);
   });
 
+  document.getElementById("panel-cuentas").addEventListener("change",e=>{
+    const s=e.target.closest("[data-ajmedio]"); if(!s) return;
+    const id=s.getAttribute("data-ajmedio"); ctaAccion={id,tipo:"ajustar",medio:s.value}; renderCuentas(); const i=$("aj-"+id); if(i){ i.focus(); i.select(); }
+  });
   document.getElementById("panel-cuentas").addEventListener("click",e=>{
     const t=e.target;
     const g=(attr)=>{ const el=t.closest("["+attr+"]"); return el?el.getAttribute(attr):null; };
@@ -1177,16 +1257,30 @@ form{display:flex;flex-direction:column;gap:14px}
     if((id=g("data-prescta"))){ presScope=id; showTab("presupuesto"); window.scrollTo(0,0); renderPresupuestoScope(); renderBudgetEditor(); return; }
     if((id=g("data-editarcta"))){ ctaAccion={id,tipo:"editar"}; renderCuentas(); const i=$("en-"+id); if(i) i.focus(); return; }
     if(t.closest("[data-ctacancel]")){ ctaAccion=null; renderCuentas(); return; }
+    if((id=g("data-unir"))){
+      const de=$("um1-"+id).value, a=$("um2-"+id).value, c=cuentaPorId(id);
+      if(!de||!a||de===a){ setStatus("Elige dos medios distintos.","err"); return; }
+      const lista=usosMedio(id,de); if(!lista.length) return;
+      const cambiar=x=>{
+        if(!esTransf(x)) return Object.assign({},x,{metodo:a});
+        let [o,dd]=ladosTransf(x.metodo); if(x.cuenta===id&&o===de) o=a; if(x.destino===id&&dd===de) dd=a;
+        return Object.assign({},x,{metodo:o+" → "+dd});
+      };
+      const nuevos=new Map(lista.map(x=>[x.id,cambiar(x)]));
+      movs=movs.map(x=>nuevos.get(x.id)||x); ctaAccion=null; render();
+      setStatus(`${lista.length} ${lista.length===1?"movimiento":"movimientos"} de ${c.nombre} pasaron de ${de} a ${a}.`,"ok");
+      encolar(`pasar movimientos de ${de} a ${a}`,[...nuevos.values()].map(m=>({accion:"editar",mov:m}))); return;
+    }
     if((id=g("data-archivar"))||(id=g("data-restaurar"))){
       const c=cuentaPorId(id); if(!c) return; const nueva=Object.assign({},c,{archivada:!c.archivada});
       cuentas=cuentas.map(x=>x.id===id?nueva:x); render();
-      setStatus(nueva.archivada?`Cuenta ${c.nombre} archivada. Sus movimientos se conservan.`:`Cuenta ${c.nombre} restaurada.`,"ok");
-      encolar((nueva.archivada?"archivar ":"restaurar ")+c.nombre,[{accion:"cuenta_editar",cuenta:nueva}]); return;
+      setStatus(nueva.archivada?`${c.nombre} archivado. Sus movimientos se conservan.`:`${c.nombre} restaurado.`,"ok");
+      encolar((nueva.archivada?"archivar a ":"restaurar a ")+c.nombre,[{accion:"cuenta_editar",cuenta:nueva}]); return;
     }
     if((id=g("data-borrarcta"))){
       if(pendingDel!=="cta:"+id){ pendingDel="cta:"+id; renderCuentas(); return; }
       pendingDel=null; const c=cuentaPorId(id); cuentas=cuentas.filter(x=>x.id!==id); render();
-      encolar("eliminar la cuenta "+(c?c.nombre:""),[{accion:"cuenta_borrar",id}]); return;
+      encolar("eliminar a "+(c?c.nombre:""),[{accion:"cuenta_borrar",id}]); return;
     }
   });
   document.addEventListener("click",e=>{
@@ -1196,37 +1290,38 @@ form{display:flex;flex-direction:column;gap:14px}
   document.getElementById("panel-cuentas").addEventListener("submit",e=>{
     const f=e.target;
     if(f.matches("[data-ajform]")){
-      e.preventDefault(); const id=f.getAttribute("data-ajform"); const c=cuentaPorId(id); const real=round2($("aj-"+id).value);
-      if(isNaN(real)) return; const dif=round2(real-saldoCuenta(id)); ctaAccion=null;
-      if(Math.abs(dif)<0.01){ renderCuentas(); setStatus(`El saldo de ${c.nombre} ya cuadra.`,"info"); return; }
-      const mov=movAjuste(id,dif,real); movs=movs.concat([mov]); render();
-      setStatus(`Saldo de ${c.nombre} ajustado a ${signo(real)} (diferencia de ${dif>0?"+":"−"}${fmtPEN(Math.abs(dif))}).`,"ok");
+      e.preventDefault(); const id=f.getAttribute("data-ajform"); const c=cuentaPorId(id); const medio=$("ajm-"+id).value; const real=round2($("aj-"+id).value);
+      if(isNaN(real)) return; const dif=round2(real-saldoMedio(id,medio)); ctaAccion=null;
+      if(Math.abs(dif)<0.01){ renderCuentas(); setStatus(`${medio} de ${c.nombre} ya cuadra.`,"info"); return; }
+      const mov=movAjuste(id,dif,real,`Saldo real de ${medio}: ${fmtPEN(real)}`,medio); movs=movs.concat([mov]); render();
+      setStatus(`${medio} de ${c.nombre} ajustado a ${signo(real)} (diferencia de ${dif>0?"+":"−"}${fmtPEN(Math.abs(dif))}).`,"ok");
       encolar("el ajuste de "+c.nombre,[{accion:"agregar",mov}]);
     }
     if(f.matches("[data-edform]")){
       e.preventDefault(); const id=f.getAttribute("data-edform"); const c=cuentaPorId(id);
       const nombre=$("en-"+id).value.trim(); if(!nombre) return;
-      const nueva=Object.assign({},c,{nombre,tipo:$("et-"+id).value}); cuentas=cuentas.map(x=>x.id===id?nueva:x); ctaAccion=null;
+      const nueva=Object.assign({},c,{nombre}); cuentas=cuentas.map(x=>x.id===id?nueva:x); ctaAccion=null;
       const pasos=[{accion:"cuenta_editar",cuenta:nueva}];
       if(servidorV4 && $("ed-"+id)){
         const color=(f.querySelector(`input[name="ec-${CSS.escape(id)}"]:checked`)||{}).value||"";
-        ajustes.cuentaInfo=Object.assign({},ajustes.cuentaInfo||{}); ajustes.cuentaInfo[id]={detalle:$("ed-"+id).value.trim(),color};
-        pasos.push({accion:"config",config:{ajustes:JSON.parse(JSON.stringify(ajustes))}});
+        const md=listaMedios($("em-"+id).value);
+        setInfo(id,{detalle:$("ed-"+id).value.trim(),color,medios:md.length?md:MEDIOS_DEF.slice()});
+        pasos.push(pasoAjustes());
       }
-      render(); setStatus(`Cuenta ${nombre} actualizada.`,"ok");
-      encolar("la cuenta "+nombre,pasos);
+      render(); setStatus(`${nombre} actualizado.`,"ok");
+      encolar("los datos de "+nombre,pasos);
     }
     if(f.id==="formConvertir"){
       e.preventDefault(); const nombre=$("cvNombre").value.trim();
-      if(!nombre){ $("cvNombre").focus(); setStatus("Escribe el nombre de la cuenta.","err"); return; }
-      if(cuentas.some(c=>c.nombre.toLowerCase()===nombre.toLowerCase())){ setStatus("Ya tienes una cuenta con ese nombre.","err"); return; }
-      const cuenta={id:nuevoId("c"),nombre,tipo:$("cvTipo").value,archivada:false,creado:new Date().toISOString()};
+      if(!nombre){ $("cvNombre").focus(); setStatus("Escribe el nombre de la persona.","err"); return; }
+      if(cuentas.some(c=>c.nombre.toLowerCase()===nombre.toLowerCase())){ setStatus("Ya registraste a alguien con ese nombre.","err"); return; }
+      const cuenta={id:nuevoId("c"),nombre,tipo:"Otro",archivada:false,creado:new Date().toISOString()};
       const lista=sinCuentaMovs(); const ids=new Set(lista.map(m=>m.id));
       const pasos=[{accion:"cuenta_agregar",cuenta}].concat(lista.map(m=>({accion:"editar",mov:conCuenta(m,cuenta.id)})));
       cuentas=cuentas.concat([cuenta]); movs=movs.map(m=>ids.has(m.id)?conCuenta(m,cuenta.id):m);
       guardarUltimaCuenta(cuenta.id); render();
-      setStatus(`Cuenta ${nombre} creada con ${lista.length} movimientos.`,"ok");
-      encolar("la cuenta "+nombre,pasos); return;
+      setStatus(`${nombre} creado con ${lista.length} movimientos.`,"ok");
+      encolar("la persona "+nombre,pasos); return;
     }
     if(f.id==="formAsignar"){
       e.preventDefault(); const cid=$("asigCta").value; const lista=sinCuentaMovs(); if(!cid||!lista.length) return;
@@ -1265,7 +1360,7 @@ form{display:flex;flex-direction:column;gap:14px}
     const mets=[...new Set(["Efectivo","Yape / Plin","Tarjeta de débito","Tarjeta de crédito","Transferencia","Otro"].concat(movs.map(x=>x.metodo)).filter(Boolean))];
     llenarSelect($("fMetodo"),mets,"Todos los medios de pago",fil.metodo);
     const fc=$("fCuenta");
-    fc.innerHTML='<option value="">Todas las cuentas</option>'+cuentas.map(c=>`<option value="${esc(c.id)}">${esc(c.nombre)}${c.archivada?" (archivada)":""}</option>`).join("")+(movs.some(x=>!x.cuenta)?'<option value="__sin">Sin cuenta</option>':"");
+    fc.innerHTML='<option value="">Todas las personas</option>'+cuentas.map(c=>`<option value="${esc(c.id)}">${esc(c.nombre)}${c.archivada?" (archivada)":""}</option>`).join("")+(movs.some(x=>!x.cuenta)?'<option value="__sin">Sin asignar</option>':"");
     fc.value=[...fc.options].some(o=>o.value===fil.cuenta)?fil.cuenta:""; fc.hidden=!cuentas.length;
     $("fTipo").value=fil.tipo; if(document.activeElement!==$("fQ")) $("fQ").value=fil.q;
     // periodo
@@ -1345,7 +1440,8 @@ form{display:flex;flex-direction:column;gap:14px}
   function txRow(x, conAcciones, conFecha, orden){
     const ing=x.tipo==="Ingreso", tr=esTransf(x);
     const [y,m,d]=x.fecha.split("-");
-    const via = tr ? (x.cuenta&&x.destino&&x.cuenta!==x.destino ? nombreCuenta(x.cuenta)+" → "+nombreCuenta(x.destino)
+    const [ta,tb]=ladosTransf(x.metodo);
+    const via = tr ? (x.cuenta&&x.destino&&x.cuenta!==x.destino ? `${nombreCuenta(x.cuenta)}${ta?" · "+ta:""} → ${nombreCuenta(x.destino)}${tb?" · "+tb:""}`
                         : [x.cuenta?nombreCuenta(x.cuenta):"", x.metodo].filter(Boolean).join(" · "))
                    : [x.cuenta?nombreCuenta(x.cuenta):"", x.metodo&&!(x.cuenta&&String(x.metodo).toLowerCase().includes(nombreCuenta(x.cuenta).toLowerCase()))?x.metodo:""].filter(Boolean).join(" · ");
     const meta=[conFecha?d+"/"+m:"", via, x.moneda==="USD"?"TC "+x.tc:""].filter(Boolean).map(esc).join(" · ");
@@ -1398,7 +1494,7 @@ form{display:flex;flex-direction:column;gap:14px}
     const cta=cuentaDePrestamo(p), ing=movs.find(m=>m.prestamoId===refIngreso(p.id));
     const opts=cuentasActivas().map(c=>`<option value="${esc(c.id)}"${c.id===cta?" selected":""}>${esc(c.nombre)}</option>`).join("")
       +(cta&&!cuentasActivas().some(c=>c.id===cta)?`<option value="${esc(cta)}" selected>${esc(nombreCuenta(cta))}</option>`:"")
-      +`<option value=""${!cta?" selected":""}>Sin cuenta</option>`;
+      +`<option value=""${!cta?" selected":""}>Sin asignar</option>`;
     const i=esc(p.id);
     return `<form class="accform" data-pedform="${i}" novalidate>
       <div class="row2"><label for="pe-ent-${i}">Entidad<input type="text" id="pe-ent-${i}" list="entidades" maxlength="60" value="${esc(p.entidad)}"></label>
@@ -1409,8 +1505,8 @@ form{display:flex;flex-direction:column;gap:14px}
       <div class="row2"><label for="pe-frq-${i}">Frecuencia<select id="pe-frq-${i}">${["Mensual","Quincenal","Semanal"].map(f=>`<option${f===p.frecuencia?" selected":""}>${f}</option>`).join("")}</select></label>
         <label for="pe-pri-${i}">Primer vencimiento<input type="date" id="pe-pri-${i}" value="${esc(p.primer)}"></label></div>
       <label for="pe-not-${i}">Descripción<input type="text" id="pe-not-${i}" maxlength="140" value="${esc(p.nota||"")}"></label>
-      ${cuentasActivas().length?`<label for="pe-acc-${i}">Cuenta a la que llegó la plata<select id="pe-acc-${i}">${opts}</select></label>
-      ${!ing?'<span class="hint">Si eliges una cuenta, lo recibido se registra como ingreso en esa cuenta.</span>':""}`:""}
+      ${cuentasActivas().length?`<label for="pe-acc-${i}">¿A quién llegó la plata?<select id="pe-acc-${i}">${opts}</select></label>
+      ${!ing?'<span class="hint">Si eliges a alguien, lo recibido se registra como ingreso suyo.</span>':""}`:""}
       <div class="foot"><button type="submit" class="primary small">Guardar cambios</button><button type="button" class="small" data-pedcancel>Cancelar</button></div>
       <span class="hint">Los pagos que ya hiciste se conservan.</span>
     </form>`;
@@ -1441,7 +1537,7 @@ form{display:flex;flex-direction:column;gap:14px}
           <div><span>Total a pagar</span><b class="num">${fmtPEN(e.total)}</b></div>
           <div><span>Interés y costos</span><b class="num ${e.interes>0?"neg":""}">${fmtPEN(e.interes)}</b></div>
           <div><span>Pagado</span><b class="num">${fmtPEN(e.pagado)}</b></div>
-          ${cuentas.length?`<div><span>Cuenta</span><b>${esc(nombreCuenta(cuentaDePrestamo(p))||"Sin cuenta")}</b></div>`:""}
+          ${cuentas.length?`<div><span>Llegó a</span><b>${esc(nombreCuenta(cuentaDePrestamo(p))||"Sin asignar")}${(()=>{const i=movs.find(m=>m.prestamoId===refIngreso(p.id));return i&&i.metodo?" · "+esc(i.metodo):"";})()}</b></div>`:""}
         </div>
         ${prestEdit===p.id?formEditarPrestamo(p):""}
         <div class="loanactions">
@@ -1499,10 +1595,10 @@ form{display:flex;flex-direction:column;gap:14px}
       const est=estadoPrestamo(p);
       $("tipoG").checked=true; fillCategorias(); $("categoria").value="Deudas / Tarjetas"; togglePrestamo();
       $("prestamoSel").value=p.id; $("moneda").value="PEN"; toggleTc();
-      if(cuentasActivas().length) selCuenta($("cuentaSel"), cuentasActivas().some(c=>c.id===cuentaDePrestamo(p)) ? cuentaDePrestamo(p) : ultimaCuenta());
+      if(cuentasActivas().length){ selCuenta($("cuentaSel"), cuentasActivas().some(c=>c.id===cuentaDePrestamo(p)) ? cuentaDePrestamo(p) : ultimaCuenta()); llenarMedios($("metodo"),$("cuentaSel").value); }
       $("monto").value=Math.min(p.cuota,est.saldo).toFixed(2); $("fecha").value=today();
       $("nota").value="Cuota "+Math.min(est.nPagadas+1,p.cuotas)+"/"+p.cuotas+" "+p.entidad;
-      showMsg(cuentasActivas().length ? "Revisa el monto, la cuenta desde la que pagas y pulsa Guardar." : "Revisa el monto y el medio de pago, y pulsa Guardar.");
+      showMsg(cuentasActivas().length ? "Revisa el monto, quién paga y con qué medio, y pulsa Guardar." : "Revisa el monto y el medio de pago, y pulsa Guardar.");
       showTab("registrar"); $("monto").focus();
       return;
     }
@@ -1526,11 +1622,12 @@ form{display:flex;flex-direction:column;gap:14px}
     }
   });
 
-  function movIngreso(p, cuenta){
+  function movIngreso(p, cuenta, medio){
     if(cuenta===undefined) cuenta = cuentasActivas().length ? ultimaCuenta() : "";
+    const metodoIng = medio || (p.entidad.toLowerCase()==="yape"?"Yape":"Transferencia bancaria");
     return {cuenta, destino:"",id:"m"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),tipo:"Ingreso",fecha:p.fecha,mes:p.fecha.slice(0,7),
       monto:p.monto,moneda:"PEN",tc:1,montoPEN:p.monto,categoria:CAT_PRESTAMO,
-      metodo:p.entidad.toLowerCase()==="yape"?"Yape / Plin":"Transferencia",
+      metodo:metodoIng,
       nota:"Préstamo "+p.entidad+(p.nota?" · "+p.nota:""),creado:new Date().toISOString(),prestamoId:refIngreso(p.id)};
   }
 
@@ -1577,10 +1674,10 @@ form{display:flex;flex-direction:column;gap:14px}
     if(!(prestamo.cuota>0)) return err("Ingresa el monto de cada cuota.");
     if(!prestamo.primer) return err("Elige la fecha del primer vencimiento.");
     const conIngreso=$("pIngreso").checked;
-    const ctaIng = $("pCuentaWrap").hidden ? "" : $("pCuenta").value;
+    const ctaIng = $("pCuentaWrap").hidden ? "" : $("pCuenta").value, medIng = $("pCuentaWrap").hidden ? "" : $("pMedio").value;
     const pasos=[{accion:"prestamo_agregar",prestamo}];
     prestamos=prestamos.concat([prestamo]);
-    if(conIngreso){ const mov=movIngreso(prestamo, ctaIng); movs=movs.concat([mov]); pasos.push({accion:"agregar",mov}); }
+    if(conIngreso){ const mov=movIngreso(prestamo, ctaIng, medIng); movs=movs.concat([mov]); pasos.push({accion:"agregar",mov}); }
     render();
     pm.textContent=`Préstamo de ${prestamo.entidad} registrado`+(conIngreso?` y ${fmtPEN(prestamo.monto)} como ingreso.`:"."); pm.className="msg";
     ["pEntidad","pMonto","pCuotas","pCuota","pPrimer","pNota"].forEach(id=>$(id).value=""); calcPrestamo();

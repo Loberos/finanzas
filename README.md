@@ -7,7 +7,7 @@ Formulario web para controlar tus finanzas personales en soles (S/) y dólares (
 - Registra gastos e ingresos con fecha, monto, moneda, tipo de cambio, categoría, medio de pago y descripción.
 - Muestra ingresos, gastos, balance y tasa de ahorro del mes.
 - Presupuesto por categoría con alertas al 80 % ("Cerca del límite") y al 100 % ("Excedido").
-- Cuentas (Yape, banco, efectivo…): cada movimiento pertenece a una cuenta; saldo por cuenta, ajuste de saldo, movimientos entre tus propias cuentas y filtro por cuenta.
+- Personas (por ejemplo Randy y Fiorella), cada una con sus medios (Yape, Plin, tarjeta, banco…): saldo por persona y por medio, ajuste de saldo por medio, movimientos entre medios o entre personas, y filtro por persona.
 - Préstamos y créditos: registra cada préstamo con sus cuotas, paga cuotas ligadas al préstamo y ve el saldo, las cuotas pagadas, la próxima fecha de pago y el interés total.
 - Botones para abrir la hoja y para descargarla como Excel (.xlsx).
 
@@ -16,7 +16,7 @@ Formulario web para controlar tus finanzas personales en soles (S/) y dólares (
 | Pestaña | Contenido |
 |---|---|
 | Movimientos | La base de datos. `Mes` y `Monto S/` se calculan solos, también en las filas que escribas a mano. |
-| Cuentas | Una cuenta por fila; el saldo actual se calcula con fórmula a partir de Movimientos (columnas `Cuenta` y `Cuenta destino`). |
+| Cuentas | Una persona por fila (sus medios se guardan en Config);  el saldo actual se calcula con fórmula a partir de Movimientos (columnas `Cuenta` y `Cuenta destino`). |
 | Préstamos | Un préstamo por fila: total a pagar, interés, pagado, saldo, cuotas pagadas y estado se calculan con fórmulas a partir de los pagos en Movimientos (columna `Préstamo`). |
 | Presupuesto | Límite por categoría, gastado, restante y estado. Cambia el mes en `B1`. |
 | Resumen mensual | Ingresos, gastos, balance y % de ahorro de cada mes. |
