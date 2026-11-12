@@ -1014,6 +1014,8 @@ form{display:flex;flex-direction:column;gap:14px}
       <div class="acchead"><div><strong>${esc(c.nombre)}</strong><div class="tag">${esc(c.tipo)}${c.archivada?" · archivada":""}</div></div></div>
       <div class="accsaldo ${v<0?"neg":""}">${signo(v)}</div>
       <div class="accmes"><span>Este mes:</span><b class="pos">+${fmtPEN(mc.ing)}</b><b class="neg">−${fmtPEN(mc.gas)}</b></div>
+      ${(()=>{ const ps=prestamos.filter(p=>cuentaDePrestamo(p)===c.id).map(p=>({p,e:estadoPrestamo(p)})).filter(x=>x.e.saldo>0);
+        return ps.length?`<div class="accmes"><span>Préstamos:</span>${ps.map(x=>`<span>${esc(x.p.entidad)} <b class="neg">${fmtPEN(x.e.saldo)}</b></span>`).join("")}<button type="button" class="linkbtn" data-goto="prestamos">Ver</button></div>`:""; })()}
       ${form}
       <div class="accacts">
         ${c.archivada?`<button type="button" class="small" data-restaurar="${esc(c.id)}">Restaurar</button>`:
@@ -1038,7 +1040,14 @@ form{display:flex;flex-direction:column;gap:14px}
         ${act.length&&servidorV3?`<form class="accform" id="formAsignar" novalidate>
           <label for="asigCta">Pasar todos a la cuenta<select id="asigCta">${act.map(c=>`<option value="${esc(c.id)}">${esc(c.nombre)}</option>`).join("")}</select></label>
           <button type="submit" class="primary small">Asignar ${sin.length} ${sin.length===1?"movimiento":"movimientos"}</button>
-          <span class="hint">También puedes asignarlos uno por uno con Editar en Movimientos.</span></form>`:'<span class="hint">Crea una cuenta para asignarle estos movimientos.</span>'}
+          <span class="hint">También puedes asignarlos uno por uno con Editar en Movimientos.</span></form>`
+          : servidorV3 ? `<form class="accform" id="formConvertir" novalidate>
+          <strong style="font-size:14px">Convertir en una cuenta</strong>
+          <label for="cvNombre">Nombre<input type="text" id="cvNombre" list="cuentasSug" maxlength="40" placeholder="Ej. Yape"></label>
+          <label for="cvTipo">Tipo<select id="cvTipo">${["Billetera digital","Banco","Efectivo","Tarjeta de crédito","App de préstamos","Otro"].map(t=>`<option>${t}</option>`).join("")}</select></label>
+          <button type="submit" class="primary small">Crear cuenta con estos movimientos</button>
+          <span class="hint">Se crea la cuenta y los ${sin.length} movimientos pasan a ella. Su saldo queda en ${signo(v)}.</span></form>`
+          : '<span class="hint">Actualiza el Apps Script para poder crear cuentas.</span>'}
         <div class="accacts"><button type="button" class="small" data-vercuenta="__sin">Ver movimientos</button></div></div>`;
     }
     $("accGrid").innerHTML = html || '<div class="empty">Aún no tienes cuentas. Crea la primera con el formulario: por ejemplo Yape, BCP o Efectivo.</div>';
@@ -1108,6 +1117,18 @@ form{display:flex;flex-direction:column;gap:14px}
       const nombre=$("en-"+id).value.trim(); if(!nombre) return;
       const nueva=Object.assign({},c,{nombre,tipo:$("et-"+id).value}); cuentas=cuentas.map(x=>x.id===id?nueva:x); ctaAccion=null; render();
       encolar("la cuenta "+nombre,[{accion:"cuenta_editar",cuenta:nueva}]);
+    }
+    if(f.id==="formConvertir"){
+      e.preventDefault(); const nombre=$("cvNombre").value.trim();
+      if(!nombre){ $("cvNombre").focus(); setStatus("Escribe el nombre de la cuenta.","err"); return; }
+      if(cuentas.some(c=>c.nombre.toLowerCase()===nombre.toLowerCase())){ setStatus("Ya tienes una cuenta con ese nombre.","err"); return; }
+      const cuenta={id:nuevoId("c"),nombre,tipo:$("cvTipo").value,archivada:false,creado:new Date().toISOString()};
+      const lista=sinCuentaMovs(); const ids=new Set(lista.map(m=>m.id));
+      const pasos=[{accion:"cuenta_agregar",cuenta}].concat(lista.map(m=>({accion:"editar",mov:Object.assign({},m,{cuenta:cuenta.id})})));
+      cuentas=cuentas.concat([cuenta]); movs=movs.map(m=>ids.has(m.id)?Object.assign({},m,{cuenta:cuenta.id}):m);
+      guardarUltimaCuenta(cuenta.id); render();
+      setStatus(`Cuenta ${nombre} creada con ${lista.length} movimientos.`,"ok");
+      encolar("la cuenta "+nombre,pasos); return;
     }
     if(f.id==="formAsignar"){
       e.preventDefault(); const cid=$("asigCta").value; const lista=sinCuentaMovs(); if(!cid||!lista.length) return;
@@ -1266,6 +1287,36 @@ form{display:flex;flex-direction:column;gap:14px}
     const dias = prox ? Math.round((prox-hoy)/DIA) : null;
     return {pagado,total,saldo,nPagadas,prox,dias,interes:round2(total-p.monto),pagos:pagos.length,ingreso};
   }
+  // La cuenta de un préstamo es la cuenta a la que llegó la plata (su ingreso); si no hay ingreso, la de su último pago.
+  function cuentaDePrestamo(p){
+    const ing=movs.find(m=>m.prestamoId===refIngreso(p.id));
+    if(ing) return ing.cuenta||"";
+    const pagos=movs.filter(m=>m.prestamoId===p.id&&m.cuenta).sort((a,b)=>(b.fecha+(b.creado||"")).localeCompare(a.fecha+(a.creado||"")));
+    return pagos[0]?pagos[0].cuenta:"";
+  }
+  let prestEdit=null;
+  function formEditarPrestamo(p){
+    const cta=cuentaDePrestamo(p), ing=movs.find(m=>m.prestamoId===refIngreso(p.id));
+    const opts=cuentasActivas().map(c=>`<option value="${esc(c.id)}"${c.id===cta?" selected":""}>${esc(c.nombre)}</option>`).join("")
+      +(cta&&!cuentasActivas().some(c=>c.id===cta)?`<option value="${esc(cta)}" selected>${esc(nombreCuenta(cta))}</option>`:"")
+      +`<option value=""${!cta?" selected":""}>Sin cuenta</option>`;
+    const i=esc(p.id);
+    return `<form class="accform" data-pedform="${i}" novalidate>
+      <div class="row2"><label for="pe-ent-${i}">Entidad<input type="text" id="pe-ent-${i}" list="entidades" maxlength="60" value="${esc(p.entidad)}"></label>
+        <label for="pe-fec-${i}">Recibido el<input type="date" id="pe-fec-${i}" value="${esc(p.fecha)}"></label></div>
+      <div class="row3"><label for="pe-mon-${i}">Recibido S/<input type="number" id="pe-mon-${i}" class="num" step="0.01" min="0.01" value="${p.monto}"></label>
+        <label for="pe-cts-${i}">N° de cuotas<input type="number" id="pe-cts-${i}" class="num" step="1" min="1" value="${p.cuotas}"></label>
+        <label for="pe-cta-${i}">Cuota S/<input type="number" id="pe-cta-${i}" class="num" step="0.01" min="0.01" value="${p.cuota}"></label></div>
+      <div class="row2"><label for="pe-frq-${i}">Frecuencia<select id="pe-frq-${i}">${["Mensual","Quincenal","Semanal"].map(f=>`<option${f===p.frecuencia?" selected":""}>${f}</option>`).join("")}</select></label>
+        <label for="pe-pri-${i}">Primer vencimiento<input type="date" id="pe-pri-${i}" value="${esc(p.primer)}"></label></div>
+      <label for="pe-not-${i}">Descripción<input type="text" id="pe-not-${i}" maxlength="140" value="${esc(p.nota||"")}"></label>
+      ${cuentasActivas().length?`<label for="pe-acc-${i}">Cuenta a la que llegó la plata<select id="pe-acc-${i}">${opts}</select></label>
+      ${!ing?'<span class="hint">Si eliges una cuenta, lo recibido se registra como ingreso en esa cuenta.</span>':""}`:""}
+      <div class="foot"><button type="submit" class="primary small">Guardar cambios</button><button type="button" class="small" data-pedcancel>Cancelar</button></div>
+      <span class="hint">Los pagos que ya hiciste se conservan.</span>
+    </form>`;
+  }
+
   function renderPrestamos(){
     const activos=[];
     let deuda=0, proxima=null;
@@ -1291,10 +1342,13 @@ form{display:flex;flex-direction:column;gap:14px}
           <div><span>Total a pagar</span><b class="num">${fmtPEN(e.total)}</b></div>
           <div><span>Interés y costos</span><b class="num ${e.interes>0?"neg":""}">${fmtPEN(e.interes)}</b></div>
           <div><span>Pagado</span><b class="num">${fmtPEN(e.pagado)}</b></div>
+          ${cuentas.length?`<div><span>Cuenta</span><b>${esc(nombreCuenta(cuentaDePrestamo(p))||"Sin cuenta")}</b></div>`:""}
         </div>
+        ${prestEdit===p.id?formEditarPrestamo(p):""}
         <div class="loanactions">
           ${e.saldo>0?`<button type="button" class="primary" data-pagar="${esc(p.id)}">Pagar cuota ${Math.min(e.nPagadas+1,p.cuotas)}</button>`:""}
           ${!e.ingreso?`<button type="button" data-ingreso="${esc(p.id)}">Registrar ${fmtPEN(p.monto)} como ingreso</button>`:""}
+          <button type="button" data-editarp="${esc(p.id)}">Editar</button>
           <button type="button" class="del${del?" confirm":""}" data-borrarp="${esc(p.id)}">${del?"¿Eliminar préstamo?":"Eliminar"}</button>
         </div>
       </div>`;
@@ -1311,16 +1365,45 @@ form{display:flex;flex-direction:column;gap:14px}
     if([...sel.options].some(o=>o.value===prev)) sel.value=prev;
   }
 
+  $("loans").addEventListener("submit", e=>{
+    const f=e.target.closest("[data-pedform]"); if(!f) return;
+    e.preventDefault();
+    const id=f.getAttribute("data-pedform"), v=k=>$("pe-"+k+"-"+id);
+    const p=prestamos.find(x=>x.id===id); if(!p) return;
+    const nuevo={id, entidad:v("ent").value.trim(), fecha:v("fec").value, monto:round2(v("mon").value), cuotas:Math.round(Number(v("cts").value)),
+      cuota:round2(v("cta").value), frecuencia:v("frq").value, primer:v("pri").value, nota:v("not").value.trim()};
+    const malo = !nuevo.entidad?"la entidad":!nuevo.fecha?"la fecha en que lo recibiste":!(nuevo.monto>0)?"el monto recibido":!(nuevo.cuotas>0)?"el número de cuotas":!(nuevo.cuota>0)?"el monto de la cuota":!nuevo.primer?"el primer vencimiento":"";
+    if(malo){ setStatus("Revisa "+malo+" del préstamo.","err"); return; }
+    // El Apps Script no tiene "editar préstamo": se reemplaza la fila con el mismo ID (los pagos se ligan por ID y se conservan).
+    const pasos=[{accion:"prestamo_borrar",id},{accion:"prestamo_agregar",prestamo:nuevo}];
+    const sel=v("acc"), cta = sel ? sel.value : cuentaDePrestamo(p);
+    const ing=movs.find(m=>m.prestamoId===refIngreso(id));
+    if(ing){
+      const nm=Object.assign({},ing,{fecha:nuevo.fecha,mes:nuevo.fecha.slice(0,7),monto:nuevo.monto,montoPEN:nuevo.monto,cuenta:cta,
+        nota:"Préstamo "+nuevo.entidad+(nuevo.nota?" · "+nuevo.nota:"")});
+      movs=movs.map(m=>m.id===ing.id?nm:m); pasos.push({accion:"editar",mov:nm});
+    } else if(sel && cta){
+      const nm=movIngreso(nuevo,cta); movs=movs.concat([nm]); pasos.push({accion:"agregar",mov:nm});
+    }
+    prestamos=prestamos.map(x=>x.id===id?nuevo:x); prestEdit=null; render();
+    setStatus(`Préstamo de ${nuevo.entidad} actualizado.`,"ok");
+    encolar("el préstamo de "+nuevo.entidad,pasos);
+  });
+
   $("loans").addEventListener("click", async e=>{
+    const ep=e.target.closest("[data-editarp]");
+    if(ep){ prestEdit = prestEdit===ep.dataset.editarp ? null : ep.dataset.editarp; renderPrestamos(); const f=$("pe-ent-"+prestEdit); if(f) f.focus(); return; }
+    if(e.target.closest("[data-pedcancel]")){ prestEdit=null; renderPrestamos(); return; }
     const pb=e.target.closest("[data-pagar]");
     if(pb){
       const p=prestamos.find(x=>x.id===pb.dataset.pagar); if(!p) return;
       const est=estadoPrestamo(p);
       $("tipoG").checked=true; fillCategorias(); $("categoria").value="Deudas / Tarjetas"; togglePrestamo();
       $("prestamoSel").value=p.id; $("moneda").value="PEN"; toggleTc();
+      if(cuentasActivas().length) selCuenta($("cuentaSel"), cuentasActivas().some(c=>c.id===cuentaDePrestamo(p)) ? cuentaDePrestamo(p) : ultimaCuenta());
       $("monto").value=Math.min(p.cuota,est.saldo).toFixed(2); $("fecha").value=today();
       $("nota").value="Cuota "+Math.min(est.nPagadas+1,p.cuotas)+"/"+p.cuotas+" "+p.entidad;
-      showMsg("Revisa el monto y el medio de pago, y pulsa Guardar.");
+      showMsg(cuentasActivas().length ? "Revisa el monto, la cuenta desde la que pagas y pulsa Guardar." : "Revisa el monto y el medio de pago, y pulsa Guardar.");
       showTab("registrar"); $("monto").focus();
       return;
     }
