@@ -407,12 +407,13 @@ form{display:flex;flex-direction:column;gap:14px}
           <label for="cuentaSel" id="cuentaWrap" hidden>Cuenta<select id="cuentaSel"></select></label>
           <label for="categoria" id="catWrap">Categoría<select id="categoria"></select></label>
           <div class="row2" id="transfSelWrap" hidden>
-            <label for="tDesdeSel">De mi cuenta<select id="tDesdeSel"></select></label>
-            <label for="tHaciaSel">A mi cuenta<select id="tHaciaSel"></select></label>
+            <label for="tDesdeSel">De la cuenta<select id="tDesdeSel"></select></label>
+            <label for="tHaciaSel">A la cuenta<select id="tHaciaSel"></select></label>
           </div>
           <div class="row2" id="transfWrap" hidden>
-            <label for="tDesde">De mi cuenta<input type="text" id="tDesde" list="cuentas" maxlength="40" placeholder="Ej. Prexpe"></label>
-            <label for="tHacia">A mi cuenta<input type="text" id="tHacia" list="cuentas" maxlength="40" placeholder="Ej. Yape"></label>
+            <label for="tDesde"><span id="tDesdeLbl">De mi cuenta</span><input type="text" id="tDesde" list="cuentas" maxlength="40" placeholder="Ej. Prexpe"></label>
+            <label for="tHacia"><span id="tHaciaLbl">A mi cuenta</span><input type="text" id="tHacia" list="cuentas" maxlength="40" placeholder="Ej. Yape"></label>
+            <span class="hint" id="mismaHint" style="grid-column:1/-1" hidden></span>
           </div>
           <datalist id="cuentas"><option>Yape</option><option>Plin</option><option>Efectivo</option><option>Prexpe</option><option>BCP</option><option>Interbank</option><option>BBVA</option><option>Scotiabank</option><option>Tarjeta de crédito</option></datalist>
           <label for="prestamoSel" id="prestamoWrap" hidden>¿Es pago de un préstamo?
@@ -747,9 +748,15 @@ form{display:flex;flex-direction:column;gap:14px}
     const t = tipoSel()==="Transferencia", n = cuentasActivas().length;
     $("catWrap").hidden=t; $("metodoWrap").hidden=t; $("transfNote").hidden=!t;
     $("cuentaWrap").hidden = t || !n;
-    $("transfSelWrap").hidden = !t || n<2;
-    $("transfWrap").hidden = !t || n>=2;
+    $("transfSelWrap").hidden = !t || n<1;
+    const misma = n>=1 && $("tDesdeSel").value && $("tDesdeSel").value===$("tHaciaSel").value;
+    $("transfWrap").hidden = !t || (n>=1 && !misma);
+    $("tDesdeLbl").textContent = misma ? "Desde (app, banco…)" : "De mi cuenta";
+    $("tHaciaLbl").textContent = misma ? "Hacia (app, banco…)" : "A mi cuenta";
+    $("mismaHint").hidden = !misma;
+    if(misma) $("mismaHint").textContent = "Movimiento dentro de "+nombreCuenta($("tDesdeSel").value)+": queda registrado, pero no cambia su saldo.";
   }
+  ["tDesdeSel","tHaciaSel"].forEach(id=>$(id).addEventListener("change",camposSegunTipo));
   function fillCategorias(){
     const tipo = tipoSel();
     const t = tipo==="Transferencia";
@@ -773,8 +780,9 @@ form{display:flex;flex-direction:column;gap:14px}
     const tipo = transf ? "Ingreso" : tipoForm;
     const conSel = !$("transfSelWrap").hidden;
     const desdeId = transf&&conSel ? $("tDesdeSel").value : "", haciaId = transf&&conSel ? $("tHaciaSel").value : "";
-    const desde = conSel ? nombreCuenta(desdeId) : $("tDesde").value.trim(), hacia = conSel ? nombreCuenta(haciaId) : $("tHacia").value.trim();
-    if(transf && conSel && desdeId===haciaId){ showMsg("Las cuentas de origen y destino deben ser distintas.",true); $("tHaciaSel").focus(); return; }
+    const misma = conSel && desdeId===haciaId;   // dentro de una misma cuenta (p. ej. Randy: Prexpe → Yape)
+    const desde = conSel&&!misma ? nombreCuenta(desdeId) : $("tDesde").value.trim(), hacia = conSel&&!misma ? nombreCuenta(haciaId) : $("tHacia").value.trim();
+    if(transf && misma && (!desde||!hacia)){ showMsg("Es la misma cuenta: escribe desde dónde y hacia dónde moviste la plata (por ejemplo Prexpe → Yape).",true); (desde?$("tHacia"):$("tDesde")).focus(); return; }
     if(transf && (!desde||!hacia)){ showMsg("Escribe de cuál de tus cuentas sale la plata y a cuál llega.",true); (desde?$("tHacia"):$("tDesde")).focus(); return; }
     if(transf && desde.toLowerCase()===hacia.toLowerCase()){ showMsg("Las cuentas de origen y destino deben ser distintas.",true); $("tHacia").focus(); return; }
     const fecha=$("fecha").value, moneda=$("moneda").value;
@@ -811,6 +819,7 @@ form{display:flex;flex-direction:column;gap:14px}
     if(esTransf(m)){
       const [a,b]=String(m.metodo||"").split("→").map(t=>t.trim()); $("tDesde").value=a||""; $("tHacia").value=b||"";
       if(m.cuenta) selCuenta($("tDesdeSel"),m.cuenta); if(m.destino) selCuenta($("tHaciaSel"),m.destino);
+      camposSegunTipo();
     }
     else { ensureOption($("categoria"),m.categoria); selCuenta($("cuentaSel"),m.cuenta||""); }
     togglePrestamo();
@@ -991,7 +1000,7 @@ form{display:flex;flex-direction:column;gap:14px}
       ? "Último ajuste el "+ajustes[0].fecha.split("-").reverse().join("/")+(futuros?" · no incluye "+futuros+" movimiento(s) con fecha futura":"")
       : (movs.length ? "¿No cuadra con tu cuenta? Pulsa Ajustar saldo y pon tu saldo real." : "Registra tus movimientos o pon tu saldo actual con Ajustar saldo.");
     $("btnAjustar").textContent = cuentasActivas().length ? "Ver mis cuentas" : "Ajustar saldo";
-    if(cuentasActivas().length) $("tDispH").textContent = "Suma de tus "+cuentasActivas().length+(cuentasActivas().length===1?" cuenta":" cuentas")+(movs.some(x=>!x.cuenta&&!esTransf(x))?" y movimientos sin cuenta":"")+(futuros?" · no incluye "+futuros+" con fecha futura":"");
+    if(cuentasActivas().length) $("tDispH").textContent = "Suma de tus "+cuentasActivas().length+(cuentasActivas().length===1?" cuenta":" cuentas")+(movs.some(x=>!x.cuenta)?" y movimientos sin cuenta":"")+(futuros?" · no incluye "+futuros+" con fecha futura":"");
     renderStrip();
     const deuda=prestamos.reduce((a,p)=>a+estadoPrestamo(p).saldo,0);
     $("tDispNeto").innerHTML = deuda>0 ? `Después de pagar tus préstamos: <b>${disp-deuda<0?"−":""}${fmtPEN(Math.abs(round2(disp-deuda)))}</b>` : "";
@@ -1027,7 +1036,7 @@ form{display:flex;flex-direction:column;gap:14px}
   function selCuenta(sel,id){ if(id && ![...sel.options].some(o=>o.value===id)){ const o=document.createElement("option"); o.value=id; o.textContent=nombreCuenta(id); sel.appendChild(o); } sel.value=id; }
   // efecto de un movimiento en el saldo de una cuenta
   function efecto(x,cid){
-    if(esTransf(x)) return x.cuenta===cid&&cid ? -x.montoPEN : (x.destino===cid&&cid ? x.montoPEN : 0);
+    if(esTransf(x)) return !cid || x.cuenta===x.destino ? 0 : x.cuenta===cid ? -x.montoPEN : (x.destino===cid ? x.montoPEN : 0);
     if((x.cuenta||"")!==cid) return 0;
     return x.tipo==="Ingreso" ? x.montoPEN : -x.montoPEN;
   }
@@ -1037,7 +1046,9 @@ form{display:flex;flex-direction:column;gap:14px}
     movs.forEach(x=>{ if(x.mes!==m||esTransf(x)||x.categoria===CAT_AJUSTE||(x.cuenta||"")!==cid) return; if(x.tipo==="Ingreso") ing+=x.montoPEN; else gas+=x.montoPEN; });
     return {ing:round2(ing),gas:round2(gas)};
   }
-  const sinCuentaMovs = () => movs.filter(x=>!x.cuenta && !esTransf(x));
+  // incluye transferencias antiguas sin cuenta: al asignarlas quedan "dentro" de esa cuenta (origen = destino)
+  const sinCuentaMovs = () => movs.filter(x=>!x.cuenta);
+  const conCuenta = (m,cid) => Object.assign({},m,{cuenta:cid}, esTransf(m)&&!m.destino ? {destino:cid} : {});
   const signo = v => (v<0?"−":"")+fmtPEN(Math.abs(v));
 
   function opcionesCuentas(sel, actual, extra){
@@ -1051,7 +1062,7 @@ form{display:flex;flex-direction:column;gap:14px}
     const prev={c:editando?$("cuentaSel").value:activa($("cuentaSel").value),d:activa($("tDesdeSel").value),h:activa($("tHaciaSel").value),p:activa($("pCuenta").value)};
     opcionesCuentas($("cuentaSel"), prev.c||u, '<option value="">Sin cuenta</option>');
     opcionesCuentas($("tDesdeSel"), prev.d||u);
-    const otra=(cuentasActivas().find(c=>c.id!==$("tDesdeSel").value)||{}).id||"";
+    const otra=(cuentasActivas().find(c=>c.id!==$("tDesdeSel").value)||{}).id||$("tDesdeSel").value;
     opcionesCuentas($("tHaciaSel"), prev.h && prev.h!==$("tDesdeSel").value ? prev.h : otra);
     opcionesCuentas($("pCuenta"), prev.p||u);
     $("pCuentaWrap").hidden = !cuentasActivas().length || !$("pIngreso").checked;
@@ -1114,7 +1125,7 @@ form{display:flex;flex-direction:column;gap:14px}
     if(sin.length){
       const v=saldoCuenta("");
       html+=`<div class="acc sincuenta">
-        <div class="acchead"><div><strong>Sin cuenta</strong><div class="tag">${sin.length} ${sin.length===1?"movimiento":"movimientos"} registrados antes de usar cuentas</div></div></div>
+        <div class="acchead"><div><strong>Sin cuenta</strong><div class="tag">${sin.length} ${sin.length===1?"movimiento":"movimientos"} sin cuenta asignada</div></div></div>
         <div class="accsaldo ${v<0?"neg":""}">${signo(v)}</div>
         ${act.length&&servidorV3?`<form class="accform" id="formAsignar" novalidate>
           <label for="asigCta">Pasar todos a la cuenta<select id="asigCta">${act.map(c=>`<option value="${esc(c.id)}">${esc(c.nombre)}</option>`).join("")}</select></label>
@@ -1211,16 +1222,16 @@ form{display:flex;flex-direction:column;gap:14px}
       if(cuentas.some(c=>c.nombre.toLowerCase()===nombre.toLowerCase())){ setStatus("Ya tienes una cuenta con ese nombre.","err"); return; }
       const cuenta={id:nuevoId("c"),nombre,tipo:$("cvTipo").value,archivada:false,creado:new Date().toISOString()};
       const lista=sinCuentaMovs(); const ids=new Set(lista.map(m=>m.id));
-      const pasos=[{accion:"cuenta_agregar",cuenta}].concat(lista.map(m=>({accion:"editar",mov:Object.assign({},m,{cuenta:cuenta.id})})));
-      cuentas=cuentas.concat([cuenta]); movs=movs.map(m=>ids.has(m.id)?Object.assign({},m,{cuenta:cuenta.id}):m);
+      const pasos=[{accion:"cuenta_agregar",cuenta}].concat(lista.map(m=>({accion:"editar",mov:conCuenta(m,cuenta.id)})));
+      cuentas=cuentas.concat([cuenta]); movs=movs.map(m=>ids.has(m.id)?conCuenta(m,cuenta.id):m);
       guardarUltimaCuenta(cuenta.id); render();
       setStatus(`Cuenta ${nombre} creada con ${lista.length} movimientos.`,"ok");
       encolar("la cuenta "+nombre,pasos); return;
     }
     if(f.id==="formAsignar"){
       e.preventDefault(); const cid=$("asigCta").value; const lista=sinCuentaMovs(); if(!cid||!lista.length) return;
-      const pasos=lista.map(m=>{ const n=Object.assign({},m,{cuenta:cid}); return {accion:"editar",mov:n}; });
-      const ids=new Set(lista.map(m=>m.id)); movs=movs.map(m=>ids.has(m.id)?Object.assign({},m,{cuenta:cid}):m); render();
+      const pasos=lista.map(m=>({accion:"editar",mov:conCuenta(m,cid)}));
+      const ids=new Set(lista.map(m=>m.id)); movs=movs.map(m=>ids.has(m.id)?conCuenta(m,cid):m); render();
       setStatus(`${lista.length} movimientos asignados a ${nombreCuenta(cid)}.`,"ok");
       encolar("asignar movimientos a "+nombreCuenta(cid),pasos);
     }
@@ -1240,7 +1251,7 @@ form{display:flex;flex-direction:column;gap:14px}
   function filtrados(){
     const [d,h]=rangoActual(), q=sinTildes(fil.q.trim());
     return movs.filter(x=>x.fecha>=d && x.fecha<=h
-      && (!fil.tipo||tipoDe(x)===fil.tipo) && (!fil.cat||x.categoria===fil.cat) && (!fil.metodo||x.metodo===fil.metodo) && (!fil.cuenta|| (fil.cuenta==="__sin" ? (!x.cuenta&&!esTransf(x)) : (x.cuenta===fil.cuenta||x.destino===fil.cuenta)))
+      && (!fil.tipo||tipoDe(x)===fil.tipo) && (!fil.cat||x.categoria===fil.cat) && (!fil.metodo||x.metodo===fil.metodo) && (!fil.cuenta|| (fil.cuenta==="__sin" ? !x.cuenta : (x.cuenta===fil.cuenta||x.destino===fil.cuenta)))
       && (!q||sinTildes(x.nota+" "+x.categoria).includes(q)));
   }
   function llenarSelect(sel,valores,todos,actual){
@@ -1254,7 +1265,7 @@ form{display:flex;flex-direction:column;gap:14px}
     const mets=[...new Set(["Efectivo","Yape / Plin","Tarjeta de débito","Tarjeta de crédito","Transferencia","Otro"].concat(movs.map(x=>x.metodo)).filter(Boolean))];
     llenarSelect($("fMetodo"),mets,"Todos los medios de pago",fil.metodo);
     const fc=$("fCuenta");
-    fc.innerHTML='<option value="">Todas las cuentas</option>'+cuentas.map(c=>`<option value="${esc(c.id)}">${esc(c.nombre)}${c.archivada?" (archivada)":""}</option>`).join("")+(movs.some(x=>!x.cuenta&&!esTransf(x))?'<option value="__sin">Sin cuenta</option>':"");
+    fc.innerHTML='<option value="">Todas las cuentas</option>'+cuentas.map(c=>`<option value="${esc(c.id)}">${esc(c.nombre)}${c.archivada?" (archivada)":""}</option>`).join("")+(movs.some(x=>!x.cuenta)?'<option value="__sin">Sin cuenta</option>':"");
     fc.value=[...fc.options].some(o=>o.value===fil.cuenta)?fil.cuenta:""; fc.hidden=!cuentas.length;
     $("fTipo").value=fil.tipo; if(document.activeElement!==$("fQ")) $("fQ").value=fil.q;
     // periodo
@@ -1334,7 +1345,8 @@ form{display:flex;flex-direction:column;gap:14px}
   function txRow(x, conAcciones, conFecha, orden){
     const ing=x.tipo==="Ingreso", tr=esTransf(x);
     const [y,m,d]=x.fecha.split("-");
-    const via = tr ? (x.cuenta&&x.destino ? nombreCuenta(x.cuenta)+" → "+nombreCuenta(x.destino) : x.metodo)
+    const via = tr ? (x.cuenta&&x.destino&&x.cuenta!==x.destino ? nombreCuenta(x.cuenta)+" → "+nombreCuenta(x.destino)
+                        : [x.cuenta?nombreCuenta(x.cuenta):"", x.metodo].filter(Boolean).join(" · "))
                    : [x.cuenta?nombreCuenta(x.cuenta):"", x.metodo&&!(x.cuenta&&String(x.metodo).toLowerCase().includes(nombreCuenta(x.cuenta).toLowerCase()))?x.metodo:""].filter(Boolean).join(" · ");
     const meta=[conFecha?d+"/"+m:"", via, x.moneda==="USD"?"TC "+x.tc:""].filter(Boolean).map(esc).join(" · ");
     const conf=pendingDel===x.id;
